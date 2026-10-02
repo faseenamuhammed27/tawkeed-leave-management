@@ -25,7 +25,13 @@ All demo accounts share one password, provided with the submission email (it is 
 | Admin | `admin@tawkeed.example` | Manages users, leave types, allowances, holidays; views audit log; approves the manager's leave |
 | Manager | `manager@tawkeed.example` | Manages Sara and Omar |
 | Employee | `employee1@tawkeed.example` | Sara Ahmed – has a pending request for the manager to act on |
-| Employee | `employee2@tawkeed.example` | Omar Farooq – has an approved request on the team calendar |
+| Employee | `employee2@tawkeed.example` | Omar Farooq – has an approved request on the team calendar (November) |
+| Employee | `lockout-test@tawkeed.example` | **For trying the failed-login lockout** – see below |
+
+**Testing the login lockout:** please use `lockout-test@tawkeed.example` rather than the shared accounts.
+After 5 wrong passwords that account is locked for 15 minutes (HTTP 429, even with the correct password),
+while every other account keeps working. It is an ordinary employee account: the lockout rules are the same
+for all users, and nothing in the authentication code treats it differently.
 
 ---
 
@@ -40,7 +46,8 @@ All demo accounts share one password, provided with the submission email (it is 
 7. [API summary](#api-summary)
 8. [Security measures](#security-measures)
 9. [Deployment](#deployment)
-10. [Assumptions, decisions and known limitations](#assumptions-decisions-and-known-limitations)
+10. [What We Chose Not to Implement](#what-we-chose-not-to-implement)
+11. [Assumptions, decisions and known limitations](#assumptions-decisions-and-known-limitations)
 
 ---
 
@@ -204,10 +211,11 @@ alembic check                              # fails if models and migrations diff
 python -m app.seed                         # demo data; safe to run repeatedly
 ```
 
-The seed creates 1 admin, 1 manager, 2 employees reporting to the manager, three leave types
-(Annual 20, Sick 10, Compassionate 5 days), sample UAE public holidays, this year's balances, and two
-sample requests (one pending, one approved) created through the real service so balances and the audit
-log stay consistent. In the Docker image, `docker-entrypoint.sh` runs migrations (and the seed when
+The seed creates 1 admin, 1 manager, 2 employees reporting to the manager, a `lockout-test` employee
+account, three leave types (Annual 20, Sick 10, Compassionate 5 days), sample UAE public holidays, this
+year's balances, and two sample requests (one pending, one approved) created through the real service so
+balances and the audit log stay consistent. The samples start about five weeks after seeding, so they are
+still in the future while the demo is reviewed. In the Docker image, `docker-entrypoint.sh` runs migrations (and the seed when
 `RUN_SEED=true`) before starting the server.
 
 ## Tests and coverage
@@ -217,7 +225,7 @@ cd backend
 pytest --cov=app --cov-report=term-missing
 ```
 
-**Result: 304 tests passing, 97% coverage** (CI fails below 70%).
+**Result: 312 tests passing, 97% coverage** (CI fails below 70%).
 
 - Tests use `TEST_DATABASE_URL` only, and refuse to run if that database's name does not end in `_test`.
 - The schema is built once per run with the real Alembic migrations (so migrations are tested too).
@@ -230,6 +238,7 @@ pytest --cov=app --cov-report=term-missing
 | `test_permissions.py` | Every protected endpoint × {anonymous, employee, manager, admin}: 401/403 as expected; a guard test fails if a new endpoint is not in the matrix |
 | `test_auth.py` | Login, identical errors for unknown email/wrong password, lockout and expiry, expired/forged/`alg=none` tokens, bcrypt storage, CORS, security headers |
 | `test_admin.py` | User management with the one-manager-level rules, allowances, leave types, holidays, audit log paging/filters, audit log is read-only |
+| `test_seed.py` | Seed is idempotent, sample requests are weeks in the future and stay within one year, locking the lockout-test account leaves the shared accounts working |
 | `test_working_days.py` | Working-day counter (weekends, holidays, holiday on weekend, month boundaries), preview endpoint, balance read model |
 
 ### Frontend tests
@@ -306,6 +315,7 @@ Status codes: `200`/`201`/`204` success · `400` business rule · `401` not logg
 | **No raw SQL built from user input**: all queries go through the SQLAlchemy ORM with bound parameters | Prevents SQL injection |
 | **No secrets in the repository**: everything comes from environment variables; `.env.example` files hold placeholders; Render generates the JWT key | Secrets cannot leak through Git; CI checks there are none |
 | **CORS limited to the frontend's origin**; no cookies, so no CSRF surface | Other websites cannot call the API from a browser |
+| Access token kept in the browser's **`localStorage`**, valid for **30 minutes**, removed on sign-out, on expiry and on any 401 | Simple and survives a page refresh. The trade-off: a script injected into the page (XSS) could read it. This is mitigated by React's automatic output escaping, no use of raw HTML injection, **no third-party scripts** (the bundle is first-party code only), and the short expiry. An HttpOnly cookie would hide the token from scripts but would need CSRF protection; that is the next step for a production system |
 | Security headers (`X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`); HTTPS enforced by Render | Basic hardening |
 | Container runs as a non-root user; production database accepts connections only from Render's private network | Limits the impact of a compromise |
 
@@ -329,6 +339,24 @@ To deploy your own copy: Render dashboard → **New → Blueprint** → select t
 2. Frontend: typecheck, Vitest and a production build.
 3. Builds the Docker image, starts Docker Compose, smoke-tests `/health`, `/docs`, login and a 403 role check,
    then builds the frontend and runs the Playwright end-to-end tests against that stack.
+
+## What We Chose Not to Implement
+
+The brief asks to prioritise working business rules, tests and a live deployment. These were left out
+deliberately to keep the scope focused; each would be a natural next step.
+
+| Not implemented | Why |
+|---|---|
+| Email or in-app notifications | Not required by the brief; managers see pending requests on their dashboard and Approvals page instead |
+| Half-day and hourly leave | Whole days keep the working-day and balance rules unambiguous (decision D5) |
+| Requests spanning two calendar years | Balances are yearly; splitting year-end leave into two requests keeps each balance correct (D5) |
+| Carry-over of unused days and accrual during the year | Allowances are set per year by an admin; carry-over policies vary by company |
+| Multi-level approval chains | One manager level was chosen (D2); managers' leave goes to an admin |
+| Refresh tokens and HttpOnly-cookie sessions | Short-lived (30-minute) access tokens keep the auth flow simple; users sign in again after expiry |
+| Per-IP rate limiting | The required failed-login limit is implemented per account; IP-based limiting is better handled by a gateway or proxy in production |
+| Self-service password reset and email changes | Needs an email service; admins can reset passwords |
+| Frontend container in Docker Compose | The frontend is a static build served by Render's CDN; Compose covers the API and database, which is where the runtime dependencies are |
+| File attachments (e.g. medical certificates) | Not in the brief; would need file storage and retention rules |
 
 ## Assumptions, decisions and known limitations
 
@@ -356,8 +384,8 @@ Where the brief left details open, these decisions were made:
 Known limitations:
 
 - With a single seeded admin, an admin's own leave cannot be approved (a second admin is needed).
-- The lockout is per account, so someone could deliberately lock another user out for 15 minutes.
-  Per-IP rate limiting would be the next step.
+- The lockout is per account, so someone could deliberately lock another user out for 15 minutes
+  (use the `lockout-test` account to try it). Per-IP rate limiting would be the next step.
 - No refresh tokens: users sign in again after 30 minutes.
 - Admins cannot change a user's email address.
 - Seeded public holidays are illustrative, not an official calendar.
