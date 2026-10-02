@@ -3,8 +3,10 @@
     python -m app.seed
 
 Creates (only what is missing): 1 admin, 1 manager, 2 employees reporting to the manager,
-3 leave types, a few sample public holidays, this year's balances, and two sample requests
-(one pending for the manager to act on, one approved so the team calendar has an entry).
+a dedicated lockout-test account, 3 leave types, a few sample public holidays, this year's
+balances, and two sample requests (one pending for the manager to act on, one approved so the
+team calendar has an entry). Sample requests are placed several weeks ahead so they are still
+in the future while the demo is being reviewed.
 Demo passwords come from SEED_DEMO_PASSWORD; existing users are never modified.
 """
 
@@ -42,6 +44,12 @@ EMPLOYEES = [
     ("employee1@tawkeed.example", "Sara Ahmed"),
     ("employee2@tawkeed.example", "Omar Farooq"),
 ]
+# For trying the failed-login lockout without locking the shared demo accounts.
+# An ordinary employee: same rules and lockout behaviour as every other account.
+LOCKOUT_TEST = ("lockout-test@tawkeed.example", "Lockout Test Account")
+
+# Sample requests start this many weeks after the seed runs (pending first, approved a week later).
+SAMPLE_PENDING_WEEKS_AHEAD = 5
 
 
 def _get_or_create_user(db: Session, email: str, name: str, role: UserRole, password_hash: str,
@@ -58,6 +66,18 @@ def _get_or_create_user(db: Session, email: str, name: str, role: UserRole, pass
 
 def _next_monday(day: date, weeks_ahead: int) -> date:
     return day + timedelta(days=(7 - day.weekday()) % 7 or 7) + timedelta(weeks=weeks_ahead - 1)
+
+
+def _sample_dates(today: date) -> tuple[date, date]:
+    """Mondays for the pending and approved samples, well in the future and in one calendar year."""
+    pending = _next_monday(today, SAMPLE_PENDING_WEEKS_AHEAD)
+    approved = pending + timedelta(weeks=1)
+    approved_end = approved + timedelta(days=2)
+    if approved_end.year != pending.year:
+        # Would straddle New Year (requests must stay in one year): use mid-January instead.
+        pending = _next_monday(date(approved_end.year, 1, 1), 2)
+        approved = pending + timedelta(weeks=1)
+    return pending, approved
 
 
 def seed(db: Session) -> list[str]:
@@ -91,9 +111,11 @@ def seed(db: Session) -> list[str]:
         emp, created = _get_or_create_user(db, email, name, UserRole.EMPLOYEE, password_hash, manager)
         employees.append(emp)
         log += [f"user {emp.email}"] if created else []
+    lockout_user, created = _get_or_create_user(db, *LOCKOUT_TEST, UserRole.EMPLOYEE, password_hash, manager)
+    log += [f"user {lockout_user.email}"] if created else []
 
     year = clock.today().year
-    for user in (admin, manager, *employees):
+    for user in (admin, manager, *employees, lockout_user):
         for lt in types.values():
             has_row = db.scalar(select(exists().where(
                 LeaveBalance.user_id == user.id, LeaveBalance.leave_type_id == lt.id, LeaveBalance.year == year)))
@@ -104,19 +126,16 @@ def seed(db: Session) -> list[str]:
 
     # Sample requests through the real service, so balances and the audit log stay consistent.
     if not db.scalar(select(exists().where(LeaveRequest.id.is_not(None)))):
-        today = clock.today()
-        pending_start = _next_monday(today, 1)
-        approved_start = _next_monday(today, 2)
-        if approved_start.year == today.year and (approved_start + timedelta(days=2)).year == today.year:
-            sara, omar = employees
-            leave_service.create_request(db, sara, LeaveRequestCreate(
-                leave_type_id=types["ANNUAL"].id, start_date=pending_start,
-                end_date=pending_start + timedelta(days=1), reason="Family visit"))
-            req = leave_service.create_request(db, omar, LeaveRequestCreate(
-                leave_type_id=types["ANNUAL"].id, start_date=approved_start,
-                end_date=approved_start + timedelta(days=2), reason="Short trip"))
-            leave_service.approve(db, manager, req.id, "Approved - enjoy")
-            log.append("sample requests (1 pending, 1 approved)")
+        pending_start, approved_start = _sample_dates(clock.today())
+        sara, omar = employees
+        leave_service.create_request(db, sara, LeaveRequestCreate(
+            leave_type_id=types["ANNUAL"].id, start_date=pending_start,
+            end_date=pending_start + timedelta(days=1), reason="Family visit"))
+        req = leave_service.create_request(db, omar, LeaveRequestCreate(
+            leave_type_id=types["ANNUAL"].id, start_date=approved_start,
+            end_date=approved_start + timedelta(days=2), reason="Short trip"))
+        leave_service.approve(db, manager, req.id, "Approved - enjoy")
+        log.append(f"sample requests (pending from {pending_start}, approved from {approved_start})")
     return log
 
 
