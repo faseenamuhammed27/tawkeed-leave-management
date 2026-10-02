@@ -35,5 +35,9 @@ class AuditLog(Base):
 
     actor: Mapped[User | None] = relationship()
 
+    @property
+    def actor_name(self) -> str | None:
+        return self.actor.full_name if self.actor else None
+
     def __repr__(self) -> str:
         return f"<AuditLog id={self.id} {self.action} {self.entity_type}#{self.entity_id}>"

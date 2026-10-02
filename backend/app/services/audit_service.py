@@ -1,3 +1,4 @@
+import enum
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -9,7 +10,7 @@ def record(
     db: Session,
     *,
     actor: User | None,
-    action: str,
+    action: str | enum.Enum,
     entity_type: str,
     entity_id: int,
     details: dict[str, Any] | None = None,
@@ -20,7 +21,7 @@ def record(
     """
     entry = AuditLog(
         actor_id=actor.id if actor else None,
-        action=action,
+        action=action.value if isinstance(action, enum.Enum) else action,
         entity_type=entity_type,
         entity_id=entity_id,
         details=details or {},
