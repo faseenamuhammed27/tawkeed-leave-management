@@ -21,3 +21,9 @@ dist/
 .idea/
 Thumbs.db
 .DS_Store
+
+# Playwright
+test-results/
+playwright-report/
+blob-report/
+*.tsbuildinfo
