@@ -45,5 +45,9 @@ class User(TimestampMixin, Base):
     )
     team_members: Mapped[list["User"]] = relationship(back_populates="manager")
 
+    @property
+    def manager_name(self) -> str | None:
+        return self.manager.full_name if self.manager else None
+
     def __repr__(self) -> str:
         return f"<User id={self.id} email={self.email!r} role={self.role.value}>"

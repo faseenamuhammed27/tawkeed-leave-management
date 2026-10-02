@@ -35,6 +35,12 @@ class Settings(BaseSettings):
     max_failed_logins: int = Field(default=5, ge=1)
     lockout_minutes: int = Field(default=15, ge=1)
 
+    # Lower only in tests to keep them fast; 12 is the production default.
+    bcrypt_rounds: int = Field(default=12, ge=4, le=16)
+
+    # Password for the demo accounts created by `python -m app.seed`.
+    seed_demo_password: SecretStr | None = None
+
     @field_validator("database_url", "test_database_url")
     @classmethod
     def _use_psycopg3_driver(cls, value: str | None) -> str | None:
