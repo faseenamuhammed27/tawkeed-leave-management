@@ -315,6 +315,14 @@ class TestRule6ApprovalRights:
         req = submit(client, manager, annual, date(2026, 3, 9), date(2026, 3, 10)).json()
         assert approve(client, admin, req["id"]).status_code == 200
 
+    def test_managers_request_is_rejected_by_admin(self, client, db, manager, admin, annual):
+        req = submit(client, manager, annual, date(2026, 3, 9), date(2026, 3, 10)).json()
+        r = reject(client, admin, req["id"], comment="Coverage needed that week")
+        assert r.status_code == 200
+        assert (r.json()["status"], r.json()["decided_by_id"]) == ("rejected", admin.id)
+        assert balance(client, manager)["used_days"] == 0
+        assert audit_rows(db, req["id"], "leave_request.rejected")[0].actor_id == admin.id
+
     def test_manager_cannot_approve_own_request(self, client, manager, annual):
         req = submit(client, manager, annual, date(2026, 3, 9), date(2026, 3, 10)).json()
         r = approve(client, manager, req["id"])
