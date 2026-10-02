@@ -3,14 +3,15 @@
 [![CI](https://github.com/faseenamuhammed27/tawkeed-leave-management/actions/workflows/ci.yml/badge.svg)](https://github.com/faseenamuhammed27/tawkeed-leave-management/actions/workflows/ci.yml)
 
 Employees apply for leave, managers approve or reject it, and admins manage the setup.
-Backend: **FastAPI · PostgreSQL 17 · SQLAlchemy 2 · Alembic · JWT**. Frontend: React + TypeScript (in progress).
+Backend: **FastAPI · PostgreSQL 17 · SQLAlchemy 2 · Alembic · JWT**. Frontend: **React 19 · TypeScript · Vite · TanStack Query**.
 
 | | |
 |---|---|
+| **Live app** | https://tawkeed-leave-web.onrender.com |
 | **Live API** | https://tawkeed-leave-api.onrender.com |
 | **API docs (Swagger)** | https://tawkeed-leave-api.onrender.com/docs |
 | **Health check** | https://tawkeed-leave-api.onrender.com/health |
-| **CI** | [GitHub Actions](https://github.com/faseenamuhammed27/tawkeed-leave-management/actions/workflows/ci.yml): pytest + coverage gate + Docker smoke test on every push |
+| **CI** | [GitHub Actions](https://github.com/faseenamuhammed27/tawkeed-leave-management/actions/workflows/ci.yml): backend pytest + coverage gate, frontend typecheck + Vitest + build, Docker + Playwright end-to-end tests on every push |
 
 > The free Render plan sleeps after 15 minutes without traffic, so the first request can take about a minute to wake it up.
 
@@ -32,7 +33,7 @@ All demo accounts share one password, provided with the submission email (it is 
 
 1. [Architecture](#architecture)
 2. [Business rules and where they are enforced](#business-rules)
-3. [Run locally](#run-locally) – with Docker, or without Docker
+3. [Run locally](#run-locally) – with Docker, or without Docker, plus the frontend
 4. [Environment variables](#environment-variables)
 5. [Migrations and seed data](#migrations-and-seed-data)
 6. [Tests and coverage](#tests-and-coverage)
@@ -63,6 +64,13 @@ backend/
   alembic/             migrations (0001 initial schema)
   tests/               pytest suite (runs against a separate test database)
   scripts/smoke_test.py  end-to-end check of a running deployment
+frontend/
+  src/api/             typed API client (base URL from VITE_API_BASE_URL) and endpoint functions
+  src/auth/            session handling: JWT + expiry, automatic sign-out on expiry or 401
+  src/components/      layout and role-based navigation, route guards, shared UI (alerts, modal, tables)
+  src/pages/           dashboard, apply, history, approvals, calendar, admin/* screens
+  src/lib/dates.ts     date formatting and calendar grid (no business rules)
+  e2e/                 Playwright end-to-end tests
 docker-compose.yml     local PostgreSQL + API
 render.yaml            production infrastructure (Render Blueprint)
 ```
@@ -140,6 +148,32 @@ python -m app.seed
 uvicorn app.main:app --reload        # http://localhost:8000/docs
 ```
 
+### Frontend
+
+Requires Node.js 20.19+ (22 recommended) and a running API (either option above).
+
+```bash
+cd frontend
+cp .env.example .env          # VITE_API_BASE_URL=http://localhost:8000
+npm install
+npm run dev                   # http://localhost:5173
+```
+
+The API's `CORS_ORIGINS` must include the frontend's address (`http://localhost:5173` by default).
+
+| Screen | Who | What it does |
+|---|---|---|
+| Dashboard | everyone | Balance cards per leave type (allocated, used, pending, available), recent requests, upcoming holidays; approvers see how many requests are waiting |
+| Apply for leave | everyone | Date pickers with a **live working-day count** from the API (`/leave-requests/preview`), holidays in range, balance warning; API errors shown in the form |
+| My requests | everyone | History with status filters; cancel own pending leave, or approved leave before it starts |
+| Approvals | manager, admin | Team queue; approve (optional comment) or reject (**comment required**) |
+| Team calendar | manager, admin | Month view of approved leave with weekends and holidays marked; admins can cancel approved leave as a correction (reason required) |
+| Users & managers, Allowances, Leave types, Public holidays, Audit log | admin | Everything the admin API offers |
+
+The frontend never re-implements business rules: working days, balances, overlaps, permissions and
+cancellation rules all come from the API, which stays the source of truth. Menu items and pages are hidden
+by role for convenience only; every call is still authorised by the backend.
+
 ## Environment variables
 
 Secrets are only ever supplied through the environment. `backend/.env.example` and `.env.example`
@@ -157,6 +191,7 @@ list every variable with placeholders; real `.env` files are git-ignored.
 | `SEED_DEMO_PASSWORD` | seeding | – | Password for the demo accounts created by `python -m app.seed` |
 | `RUN_SEED` | no | `false` | Container only: run the (idempotent) seed on start |
 | `ENVIRONMENT` | no | `development` | `development`, `test` or `production` |
+| `VITE_API_BASE_URL` | frontend | `http://localhost:8000` | API address compiled into the frontend bundle (public, not a secret) |
 
 ## Migrations and seed data
 
@@ -182,7 +217,7 @@ cd backend
 pytest --cov=app --cov-report=term-missing
 ```
 
-**Result: 303 tests passing, 97% coverage** (CI fails below 70%).
+**Result: 304 tests passing, 97% coverage** (CI fails below 70%).
 
 - Tests use `TEST_DATABASE_URL` only, and refuse to run if that database's name does not end in `_test`.
 - The schema is built once per run with the real Alembic migrations (so migrations are tested too).
@@ -196,6 +231,28 @@ pytest --cov=app --cov-report=term-missing
 | `test_auth.py` | Login, identical errors for unknown email/wrong password, lockout and expiry, expired/forged/`alg=none` tokens, bcrypt storage, CORS, security headers |
 | `test_admin.py` | User management with the one-manager-level rules, allowances, leave types, holidays, audit log paging/filters, audit log is read-only |
 | `test_working_days.py` | Working-day counter (weekends, holidays, holiday on weekend, month boundaries), preview endpoint, balance read model |
+
+### Frontend tests
+
+```bash
+cd frontend
+npm test                      # Vitest + Testing Library (42 tests)
+npm run typecheck
+E2E_PASSWORD=<demo password> npm run e2e   # Playwright; needs the API and `npm run preview -- --port 5173` running
+```
+
+| File | Covers |
+|---|---|
+| `src/api/client.test.ts` | Bearer token, API error shape → readable messages, field validation errors, sign-out on 401, network errors |
+| `src/components/Layout.test.tsx` | Menu per role, route guards (signed out → login, wrong role → "no access") |
+| `src/pages/LoginPage.test.tsx` | Required fields, wrong password and lockout messages from the API, successful sign-in |
+| `src/pages/ApplyLeavePage.test.tsx` | Live working-day count from the API, balance warning, end-before-start, required fields, API refusal shown, successful submit |
+| `src/pages/ApprovalsPage.test.tsx` | Team queue, empty state, **reject disabled until a comment is entered**, approve, API refusal shown in the dialog |
+| `src/pages/HistoryPage.test.tsx` | Status and decision details, cancel only where allowed, cancel flow, API refusal, empty and error states |
+| `src/lib/dates.test.ts` | Asia/Dubai "today", month grid, date ranges |
+| `e2e/leave-workflow.spec.ts` | Real browser against the real API: employee applies (live count, overlap refused, admin pages blocked) → manager approves one and rejects one with a comment → calendar shows the approved leave → employee sees the decisions and cancels → admin screens and audit log. Also runs the login error on a mobile viewport |
+
+CI runs the Playwright suite against the Docker Compose stack on every push.
 
 **Deployment check:** `scripts/smoke_test.py` runs 37 end-to-end checks (login, role checks, submit →
 approve → cancel, rejection, balances, calendar, audit log) against a running server:
@@ -257,6 +314,8 @@ Status codes: `200`/`201`/`204` success · `400` business rule · `401` not logg
 Hosted on **Render** using the Blueprint in [`render.yaml`](render.yaml):
 
 - **tawkeed-leave-db** – managed PostgreSQL 17, private network only.
+- **tawkeed-leave-web** – the React app as a static site (`npm ci && npm run build`), with SPA rewrites and security headers.
+  `VITE_API_BASE_URL` points it at the API; the API's `CORS_ORIGINS` allows only this address.
 - **tawkeed-leave-api** – the Docker image from `backend/Dockerfile`, HTTPS by default, health check on `/health`.
   Deploys automatically **only after CI passes** on `main`.
 - On every start the container runs `alembic upgrade head` and the idempotent seed, then uvicorn.
@@ -267,7 +326,9 @@ To deploy your own copy: Render dashboard → **New → Blueprint** → select t
 
 **CI** (`.github/workflows/ci.yml`) on every push and pull request:
 1. pytest against a throwaway PostgreSQL 17 service, failing below 70% coverage; `alembic check`; coverage summary on the run page.
-2. Builds the Docker image, starts Docker Compose, and smoke-tests `/health`, `/docs`, login and a 403 role check.
+2. Frontend: typecheck, Vitest and a production build.
+3. Builds the Docker image, starts Docker Compose, smoke-tests `/health`, `/docs`, login and a 403 role check,
+   then builds the frontend and runs the Playwright end-to-end tests against that stack.
 
 ## Assumptions, decisions and known limitations
 
