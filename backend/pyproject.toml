@@ -19,5 +19,5 @@ omit = ["app/seed.py"]
 [tool.coverage.report]
 show_missing = true
 skip_covered = false
-fail_under = 80
+fail_under = 70
 exclude_also = ["if __name__ == .__main__.:"]

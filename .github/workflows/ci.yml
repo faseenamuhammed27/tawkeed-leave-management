@@ -1,0 +1,132 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend-tests:
+    name: Backend tests (pytest + coverage)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: tawkeed_leave_test
+          POSTGRES_USER: postgres
+          # Throwaway CI database reachable only inside this job; no password needed.
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      ENVIRONMENT: test
+      DATABASE_URL: postgresql+psycopg://postgres@localhost:5432/tawkeed_leave_test
+      TEST_DATABASE_URL: postgresql+psycopg://postgres@localhost:5432/tawkeed_leave_test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Generate a per-run JWT secret
+        run: echo "JWT_SECRET_KEY=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+
+      - name: Run tests with coverage (fails below 70%)
+        run: >-
+          pytest
+          --cov=app
+          --cov-report=term-missing
+          --cov-report=xml
+          --cov-fail-under=70
+          --junitxml=pytest-report.xml
+
+      - name: Check models and migrations are in sync
+        run: alembic -x db=test check
+
+      - name: Coverage summary
+        if: always()
+        run: |
+          if [ -f coverage.xml ]; then
+            python - <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          import xml.etree.ElementTree as ET
+          root = ET.parse("coverage.xml").getroot()
+          print(f"### Backend coverage: {float(root.get('line-rate')) * 100:.1f}% lines, "
+                f"{float(root.get('branch-rate')) * 100:.1f}% branches")
+          EOF
+          fi
+
+      - name: Upload test and coverage reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-reports
+          path: |
+            backend/coverage.xml
+            backend/pytest-report.xml
+
+  docker:
+    name: Docker image + Compose smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create throwaway .env for Compose
+        run: |
+          {
+            echo "POSTGRES_PASSWORD=$(openssl rand -hex 16)"
+            echo "JWT_SECRET_KEY=$(openssl rand -hex 32)"
+            echo "SEED_DEMO_PASSWORD=$(openssl rand -hex 12)"
+          } > .env
+
+      - name: Build and start the stack
+        run: docker compose up -d --build --wait --wait-timeout 180
+
+      - name: Smoke test the running API
+        run: |
+          set -e
+          curl -fsS http://localhost:8000/health
+          curl -fsS -o /dev/null http://localhost:8000/docs
+          PASSWORD=$(grep '^SEED_DEMO_PASSWORD=' .env | cut -d= -f2)
+          TOKEN=$(curl -fsS -X POST http://localhost:8000/api/v1/auth/login \
+            -H 'Content-Type: application/json' \
+            -d "{\"email\":\"manager@tawkeed.example\",\"password\":\"$PASSWORD\"}" \
+            | python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])')
+          curl -fsS -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/v1/team/leave-requests > /dev/null
+          STATUS=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/v1/admin/users)
+          test "$STATUS" = "403"
+          echo "Docker smoke test passed"
+
+      - name: Show logs on failure
+        if: failure()
+        run: docker compose logs
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v
