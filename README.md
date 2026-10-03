@@ -8,7 +8,7 @@ Backend: **FastAPI · PostgreSQL 17 · SQLAlchemy 2 · Alembic · JWT**. Fronten
 | | |
 |---|---|
 | **Live app** | https://tawkeed-leave-web.onrender.com |
-| **Live API** | https://tawkeed-leave-api.onrender.com |
+| **Live API (base URL)** | `https://tawkeed-leave-api.onrender.com/api/v1` – browse it through the Swagger docs below |
 | **API docs (Swagger)** | https://tawkeed-leave-api.onrender.com/docs |
 | **Health check** | https://tawkeed-leave-api.onrender.com/health |
 | **CI** | [GitHub Actions](https://github.com/faseenamuhammed27/tawkeed-leave-management/actions/workflows/ci.yml): backend pytest + coverage gate, frontend typecheck + Vitest + build, Docker + Playwright end-to-end tests on every push |
