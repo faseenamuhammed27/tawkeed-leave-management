@@ -317,13 +317,15 @@ Status codes: `200`/`201`/`204` success · `400` business rule · `401` not logg
 | **CORS limited to the frontend's origin**; no cookies, so no CSRF surface | Other websites cannot call the API from a browser |
 | Access token kept in the browser's **`localStorage`**, valid for **30 minutes**, removed on sign-out, on expiry and on any 401 | Simple and survives a page refresh. The trade-off: a script injected into the page (XSS) could read it. This is mitigated by React's automatic output escaping, no use of raw HTML injection, **no third-party scripts** (the bundle is first-party code only), and the short expiry. An HttpOnly cookie would hide the token from scripts but would need CSRF protection; that is the next step for a production system |
 | Security headers (`X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`); HTTPS enforced by Render | Basic hardening |
-| Container runs as a non-root user; production database accepts connections only from Render's private network | Limits the impact of a compromise |
+| Container runs as a non-root user; production database connections require the long, Render-generated password and are encrypted with SSL | Limits the impact of a compromise and protects data in transit |
 
 ## Deployment
 
 Hosted on **Render** using the Blueprint in [`render.yaml`](render.yaml):
 
-- **tawkeed-leave-db** – managed PostgreSQL 17, private network only.
+- **tawkeed-leave-db** – managed PostgreSQL 17. Connections need the Render-generated password and SSL. `render.yaml` asks for no
+  external IP allow-list (`ipAllowList: []`), but the free plan applies an inherited workspace-level allow-all rule
+  (`0.0.0.0/0`) that cannot be removed, so the database is reachable from the internet with those credentials.
 - **tawkeed-leave-web** – the React app as a static site (`npm ci && npm run build`), with SPA rewrites and security headers.
   `VITE_API_BASE_URL` points it at the API; the API's `CORS_ORIGINS` allows only this address.
 - **tawkeed-leave-api** – the Docker image from `backend/Dockerfile`, HTTPS by default, health check on `/health`.
@@ -387,6 +389,8 @@ Known limitations:
 - The lockout is per account, so someone could deliberately lock another user out for 15 minutes
   (use the `lockout-test` account to try it). Per-IP rate limiting would be the next step.
 - No refresh tokens: users sign in again after 30 minutes.
+- On Render's free plan the database cannot be restricted to the private network (an inherited `0.0.0.0/0` rule applies);
+  it is protected by its generated password and SSL. A paid plan would allow limiting it to Render's private network.
 - Admins cannot change a user's email address.
 - Seeded public holidays are illustrative, not an official calendar.
 - Render free tier: the service sleeps when idle (slow first request) and the free database expires after 30 days.
