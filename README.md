@@ -24,8 +24,8 @@ All demo accounts share one password, provided with the submission email (it is 
 |---|---|---|
 | Admin | `admin@tawkeed.example` | Manages users, leave types, allowances, holidays; views audit log; approves the manager's leave |
 | Manager | `manager@tawkeed.example` | Manages Sara and Omar |
-| Employee | `employee1@tawkeed.example` | Sara Ahmed – has a pending request for the manager to act on |
-| Employee | `employee2@tawkeed.example` | Omar Farooq – has an approved request on the team calendar (November) |
+| Employee | `employee1@tawkeed.example` | Sara Ahmed – has a pending request (2–3 Nov) for the manager to act on |
+| Employee | `employee2@tawkeed.example` | Omar Farooq – has an approved request (9–11 Nov) on the team calendar |
 | Employee | `lockout-test@tawkeed.example` | **For trying the failed-login lockout** – see below |
 
 **Testing the login lockout:** please use `lockout-test@tawkeed.example` rather than the shared accounts.
@@ -183,8 +183,8 @@ by role for convenience only; every call is still authorised by the backend.
 
 ## Environment variables
 
-Secrets are only ever supplied through the environment. `backend/.env.example` and `.env.example`
-list every variable with placeholders; real `.env` files are git-ignored.
+Secrets are only ever supplied through the environment. `backend/.env.example`, `frontend/.env.example`
+and the root `.env.example` (for Docker Compose) list every variable with placeholders; real `.env` files are git-ignored.
 
 | Variable | Required | Default | Purpose |
 |---|---|---|---|
@@ -220,12 +220,23 @@ still in the future while the demo is reviewed. In the Docker image, `docker-ent
 
 ## Tests and coverage
 
+### Test report
+
+| Suite | Tool | Tests | Result |
+|---|---|---|---|
+| Backend: business rules, permissions, auth/security, admin, seed | pytest + coverage | 312 | all passing, **97.5% line coverage** (CI gate: 70%) |
+| Frontend: components, API client, role-based UI | Vitest + Testing Library | 42 | all passing |
+| End-to-end: full employee → manager → admin workflow in a real browser | Playwright | 3 | all passing (CI, local, and once against the live site) |
+| Deployment smoke test against a running API | `scripts/smoke_test.py` | 37 checks | all passing |
+
+All suites run on every push in [GitHub Actions](https://github.com/faseenamuhammed27/tawkeed-leave-management/actions/workflows/ci.yml).
+
+### Backend tests
+
 ```bash
 cd backend
 pytest --cov=app --cov-report=term-missing
 ```
-
-**Result: 312 tests passing, 97% coverage** (CI fails below 70%).
 
 - Tests use `TEST_DATABASE_URL` only, and refuse to run if that database's name does not end in `_test`.
 - The schema is built once per run with the real Alembic migrations (so migrations are tested too).
@@ -267,10 +278,13 @@ CI runs the Playwright suite against the Docker Compose stack on every push.
 approve → cancel, rejection, balances, calendar, audit log) against a running server:
 
 ```bash
-SMOKE_PASSWORD=<demo password> python scripts/smoke_test.py https://<host>
+SMOKE_PASSWORD=<demo password> python scripts/smoke_test.py http://localhost:8000
 ```
 
-Last run against production (`https://tawkeed-leave-api.onrender.com`, 3 Oct 2026): **37/37 passed**.
+It creates (and then cancels or rejects) real leave requests, so point it at a local or staging server.
+Before the demo data was finalised it was run against production on 3 Oct 2026 (**37/37 passed**), together
+with the Playwright suite against the live site (**3/3 passed**); the production database was then reset and
+re-seeded so reviewers start from clean demo data.
 
 ## API summary
 
@@ -313,7 +327,7 @@ Status codes: `200`/`201`/`204` success · `400` business rule · `401` not logg
 | Same 401 message and similar timing for unknown email and wrong password | Prevents discovering which accounts exist |
 | **Input validation** on every field (Pydantic, unknown fields rejected, length limits); DB constraints as a backstop | Bad data is rejected early with clear 422 errors |
 | **No raw SQL built from user input**: all queries go through the SQLAlchemy ORM with bound parameters | Prevents SQL injection |
-| **No secrets in the repository**: everything comes from environment variables; `.env.example` files hold placeholders; Render generates the JWT key | Secrets cannot leak through Git; CI checks there are none |
+| **No secrets in the repository**: everything comes from environment variables; `.env` files are git-ignored and `.env.example` files hold placeholders; Render generates the JWT key; CI uses throwaway, per-run secrets | Secrets cannot leak through Git |
 | **CORS limited to the frontend's origin**; no cookies, so no CSRF surface | Other websites cannot call the API from a browser |
 | Access token kept in the browser's **`localStorage`**, valid for **30 minutes**, removed on sign-out, on expiry and on any 401 | Simple and survives a page refresh. The trade-off: a script injected into the page (XSS) could read it. This is mitigated by React's automatic output escaping, no use of raw HTML injection, **no third-party scripts** (the bundle is first-party code only), and the short expiry. An HttpOnly cookie would hide the token from scripts but would need CSRF protection; that is the next step for a production system |
 | Security headers (`X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`); HTTPS enforced by Render | Basic hardening |
