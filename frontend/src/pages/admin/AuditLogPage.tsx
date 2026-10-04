@@ -39,28 +39,48 @@ function summarise(details: Record<string, unknown>): string {
 
 export function AuditLogPage() {
   const [action, setAction] = useState("");
+  const [actorId, setActorId] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [page, setPage] = useState(1);
 
   const logs = useQuery({
-    queryKey: ["audit-logs", action, page],
-    queryFn: () => adminApi.auditLogs({ action: action || undefined, page, page_size: PAGE_SIZE }),
+    queryKey: ["audit-logs", action, actorId, startDate, endDate, page],
+    queryFn: () =>
+      adminApi.auditLogs({
+        action: action || undefined,
+        actor_id: actorId ? Number(actorId) : undefined,
+        start_date: startDate || undefined,
+        end_date: endDate || undefined,
+        page,
+        page_size: PAGE_SIZE,
+      }),
     placeholderData: keepPreviousData,
   });
+  // Everyone who can appear as an actor, including deactivated users and the admin.
+  const users = useQuery({ queryKey: ["admin-users", "all"], queryFn: () => adminApi.users() });
+
+  const anyFilter = Boolean(action || actorId || startDate || endDate);
+  // Any filter change starts again from the first page.
+  const change = (setter: (v: string) => void) => (value: string) => {
+    setter(value);
+    setPage(1);
+  };
+  function clearFilters() {
+    setAction("");
+    setActorId("");
+    setStartDate("");
+    setEndDate("");
+    setPage(1);
+  }
 
   const totalPages = logs.data ? Math.max(1, Math.ceil(logs.data.total / PAGE_SIZE)) : 1;
 
   return (
     <>
       <PageHeader title="Audit log" subtitle="Who did what, and when. Entries cannot be edited or deleted." />
-      <div className="toolbar">
-        <select
-          aria-label="Filter by action"
-          value={action}
-          onChange={(e) => {
-            setAction(e.target.value);
-            setPage(1);
-          }}
-        >
+      <div className="toolbar" role="group" aria-label="Filters">
+        <select aria-label="Filter by action" value={action} onChange={(e) => change(setAction)(e.target.value)}>
           <option value="">All actions</option>
           {ACTIONS.map((a) => (
             <option key={a} value={a}>
@@ -68,6 +88,22 @@ export function AuditLogPage() {
             </option>
           ))}
         </select>
+        <select aria-label="Who" value={actorId} onChange={(e) => change(setActorId)(e.target.value)}>
+          <option value="">Everyone</option>
+          {(users.data ?? []).map((u) => (
+            <option key={u.id} value={u.id}>
+              {u.full_name}
+              {u.is_active ? "" : " (deactivated)"}
+            </option>
+          ))}
+        </select>
+        <input type="date" aria-label="From date" value={startDate} onChange={(e) => change(setStartDate)(e.target.value)} />
+        <input type="date" aria-label="To date" min={startDate || undefined} value={endDate} onChange={(e) => change(setEndDate)(e.target.value)} />
+        {anyFilter && (
+          <button type="button" className="btn btn-small btn-ghost" onClick={clearFilters}>
+            Clear filters
+          </button>
+        )}
         {logs.data && <span className="muted small">{logs.data.total} entries</span>}
       </div>
 
@@ -119,7 +155,7 @@ export function AuditLogPage() {
             </div>
           </>
         ) : (
-          <EmptyState title="No audit entries" />
+          <EmptyState title={anyFilter ? "No audit entries match these filters" : "No audit entries"} />
         ))}
     </>
   );

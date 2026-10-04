@@ -1,9 +1,11 @@
+from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Query, Response, status
 
 from app.api.deps import AdminUser, DbSession
 from app.core import clock
+from app.core.errors import InvalidInputError
 from app.models import UserRole
 from app.schemas.common import ErrorResponse, Page
 from app.schemas.leave import (
@@ -112,13 +114,17 @@ def audit_logs(
     actor_id: int | None = None,
     entity_type: Annotated[str | None, Query(max_length=50)] = None,
     entity_id: int | None = None,
+    start_date: Annotated[date | None, Query(description="From this day (business timezone)")] = None,
+    end_date: Annotated[date | None, Query(description="Up to and including this day")] = None,
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=100)] = 50,
 ):
     """Newest first. Read-only: there is no endpoint to edit or delete audit entries."""
+    if start_date and end_date and end_date < start_date:
+        raise InvalidInputError("end_date cannot be before start_date")
     rows, total = admin_service.audit_page(
         db, action=action, actor_id=actor_id, entity_type=entity_type, entity_id=entity_id,
-        page=page, page_size=page_size,
+        start_date=start_date, end_date=end_date, page=page, page_size=page_size,
     )
     return Page[AuditLogOut](
         items=[AuditLogOut.model_validate(r) for r in rows], total=total, page=page, page_size=page_size

@@ -276,6 +276,43 @@ class TestAuditLog:
         page = client.get("/api/v1/admin/audit-logs", params={"actor_id": manager.id}, headers=auth_headers(admin)).json()
         assert [i["action"] for i in page["items"]] == ["leave_request.approved"]
 
+    def test_filter_by_date_range(self, client, db, admin):
+        from datetime import datetime, timezone
+
+        from app.models import AuditLog
+
+        # Two entries on different days (Asia/Dubai): 1 Mar 10:00 and 3 Mar 10:00 local time.
+        db.add_all([
+            AuditLog(actor_id=admin.id, action="x.old", entity_type="t", entity_id=1, details={},
+                     created_at=datetime(2026, 3, 1, 6, 0, tzinfo=timezone.utc)),
+            AuditLog(actor_id=admin.id, action="x.new", entity_type="t", entity_id=2, details={},
+                     created_at=datetime(2026, 3, 3, 6, 0, tzinfo=timezone.utc)),
+        ])
+        db.flush()
+        get = lambda **p: [i["action"] for i in client.get("/api/v1/admin/audit-logs", params={"entity_type": "t", **p},
+                                                            headers=auth_headers(admin)).json()["items"]]
+        assert get(start_date="2026-03-02") == ["x.new"]
+        assert get(end_date="2026-03-01") == ["x.old"]
+        assert get(start_date="2026-03-01", end_date="2026-03-03") == ["x.new", "x.old"]
+        assert get(start_date="2026-03-02", end_date="2026-03-02") == []
+
+    def test_date_range_uses_business_timezone(self, client, db, admin):
+        from datetime import datetime, timezone
+
+        from app.models import AuditLog
+
+        # 22:30 UTC on 1 Mar is already 2 Mar in Dubai (UTC+4).
+        db.add(AuditLog(actor_id=admin.id, action="x.late", entity_type="tz", entity_id=1, details={},
+                        created_at=datetime(2026, 3, 1, 22, 30, tzinfo=timezone.utc)))
+        db.flush()
+        r = client.get("/api/v1/admin/audit-logs", params={"entity_type": "tz", "start_date": "2026-03-02", "end_date": "2026-03-02"},
+                       headers=auth_headers(admin)).json()
+        assert [i["action"] for i in r["items"]] == ["x.late"]
+
+    def test_invalid_date_range_is_422(self, client, admin):
+        r = client.get("/api/v1/admin/audit-logs", params={"start_date": "2026-03-05", "end_date": "2026-03-01"}, headers=auth_headers(admin))
+        assert r.status_code == 422
+
     def test_audit_log_cannot_be_modified(self, client, admin):
         for method in ("post", "put", "patch", "delete"):
             r = getattr(client, method)("/api/v1/admin/audit-logs", headers=auth_headers(admin))

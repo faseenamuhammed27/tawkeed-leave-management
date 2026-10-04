@@ -4,12 +4,15 @@ Configuration changes are written to the audit log too, so the admin can see who
 """
 
 from collections.abc import Sequence
+from datetime import date, datetime, time, timedelta
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import exists, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
+from app.core.config import get_settings
 from app.core.errors import BusinessRuleError, ConflictError, NotFoundError
 from app.core.security import hash_password
 from app.models import AuditAction, AuditLog, LeaveType, PublicHoliday, User, UserRole
@@ -255,11 +258,22 @@ def delete_holiday(db: Session, actor: User, holiday_id: int) -> None:
 
 # ------------------------------------------------------------------ audit log
 
+def _day_start_utc(day: date) -> datetime:
+    """Midnight of `day` in the business timezone, as an aware datetime."""
+    return datetime.combine(day, time.min, tzinfo=ZoneInfo(get_settings().app_timezone))
+
+
 def audit_page(
     db: Session, *, action: str | None, actor_id: int | None, entity_type: str | None,
-    entity_id: int | None, page: int, page_size: int,
+    entity_id: int | None, start_date: date | None = None, end_date: date | None = None,
+    page: int, page_size: int,
 ) -> tuple[Sequence[AuditLog], int]:
+    """Newest first. start_date/end_date are whole days in the business timezone (inclusive)."""
     stmt = select(AuditLog)
+    if start_date is not None:
+        stmt = stmt.where(AuditLog.created_at >= _day_start_utc(start_date))
+    if end_date is not None:
+        stmt = stmt.where(AuditLog.created_at < _day_start_utc(end_date + timedelta(days=1)))
     if action:
         stmt = stmt.where(AuditLog.action == action)
     if actor_id is not None:

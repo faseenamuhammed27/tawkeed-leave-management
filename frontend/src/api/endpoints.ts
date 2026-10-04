@@ -94,6 +94,14 @@ export const adminApi = {
   updateHoliday: (id: number, body: Partial<{ holiday_date: string; name: string }>) =>
     api.patch<Holiday>(`${V1}/admin/holidays/${id}`, body),
   deleteHoliday: (id: number) => api.delete<void>(`${V1}/admin/holidays/${id}`),
-  auditLogs: (query: { action?: string; entity_type?: string; page: number; page_size: number }) =>
+  auditLogs: (query: {
+    action?: string;
+    actor_id?: number;
+    entity_type?: string;
+    start_date?: string;
+    end_date?: string;
+    page: number;
+    page_size: number;
+  }) =>
     api.get<Page<AuditLog>>(`${V1}/admin/audit-logs`, query),
 };

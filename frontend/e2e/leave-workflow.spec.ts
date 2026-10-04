@@ -13,7 +13,9 @@ const USERS = {
 const year = Number(todayISO().slice(0, 4)) + 1;
 const jan1 = `${year}-01-01`;
 const firstMonday = addDays(jan1, (8 - new Date(`${jan1}T00:00:00Z`).getUTCDay()) % 7);
-const monday = addDays(firstMonday, 7 * (6 + (Math.floor(Date.now() / 600_000) % 30)));
+const monday = addDays(firstMonday, 7 * (6 + (Math.floor(Date.now() / 600_000) % 40)));
+// A unique tag per run, written into the reason, so rows from earlier runs on a reused database never match.
+const RUN = `e2e-${Date.now().toString(36)}`;
 const A = { start: monday, end: addDays(monday, 1) }; // Mon-Tue: will be approved, then cancelled
 const B = { start: addDays(monday, 3), end: addDays(monday, 4) }; // Thu-Fri: will be rejected
 
@@ -35,6 +37,7 @@ async function apply(page: Page, range: { start: string; end: string }) {
   await page.getByRole("link", { name: "Apply for leave" }).first().click();
   await page.getByLabel("Start date").fill(range.start);
   await page.getByLabel("End date").fill(range.end);
+  await page.getByLabel("Reason (optional)").fill(RUN);
   await expect(page.getByTestId("working-days")).toHaveText("2 working days"); // live count from the API
   await page.getByRole("button", { name: "Submit request" }).click();
   await expect(page.getByText("Leave request submitted and waiting for approval.")).toBeVisible();
@@ -43,7 +46,7 @@ async function apply(page: Page, range: { start: string; end: string }) {
 const nav = (page: Page) => page.getByRole("navigation", { name: "Main" });
 
 const row = (page: Page, range: { start: string; end: string }) =>
-  page.getByRole("row").filter({ hasText: formatRange(range.start, range.end) });
+  page.getByRole("row").filter({ hasText: formatRange(range.start, range.end) }).filter({ hasText: RUN });
 
 test.beforeAll(() => {
   if (!PASSWORD) throw new Error("Set E2E_PASSWORD to the demo accounts' password");

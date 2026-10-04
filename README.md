@@ -234,8 +234,8 @@ still in the future while the demo is reviewed. In the Docker image, `docker-ent
 
 | Suite | Tool | Tests | Result |
 |---|---|---|---|
-| Backend: business rules, permissions, auth/security, admin, seed | pytest + coverage | 336 | all passing, **97.6% line coverage** (CI gate: 70%) |
-| Frontend: components, API client, role-based UI | Vitest + Testing Library | 57 | all passing |
+| Backend: business rules, permissions, auth/security, admin, seed | pytest + coverage | 339 | all passing, **97.6% line coverage** (CI gate: 70%) |
+| Frontend: components, API client, role-based UI | Vitest + Testing Library | 59 | all passing |
 | End-to-end: full employee → manager → admin workflow in a real browser | Playwright | 3 | all passing (CI, local, and once against the live site) |
 | Deployment smoke test against a running API | `scripts/smoke_test.py` | 37 checks | all passing |
 
@@ -266,7 +266,7 @@ pytest --cov=app --cov-report=term-missing
 
 ```bash
 cd frontend
-npm test                      # Vitest + Testing Library (57 tests)
+npm test                      # Vitest + Testing Library (59 tests)
 npm run typecheck
 E2E_PASSWORD=<demo password> npm run e2e   # Playwright; needs the API and `npm run preview -- --port 5173` running
 ```
@@ -281,6 +281,7 @@ E2E_PASSWORD=<demo password> npm run e2e   # Playwright; needs the API and `npm 
 | `src/pages/ApprovalsPage.test.tsx` | Queue, empty state, **reject disabled until a comment is entered**, approve, API refusal shown, filters read from the URL and sent to the API, no role filter for managers |
 | `src/pages/HistoryPage.test.tsx` | Status and decision details, cancel only where allowed, cancel flow, API refusal, empty and error states |
 | `src/pages/TeamMembersPage.test.tsx` | Balance and status counts per leave type, role/manager columns and role filter for the admin only, leave type filter, empty state |
+| `src/pages/admin/AuditLogPage.test.tsx` | Who and date-range filters sent to the API, Clear filters, empty state |
 | `src/lib/dates.test.ts` | Asia/Dubai "today", month grid, date ranges |
 | `e2e/leave-workflow.spec.ts` | Real browser against the real API: employee applies (live count, overlap refused, admin pages blocked) → manager approves one and rejects one with a comment → calendar shows the approved leave → employee sees the decisions and cancels → admin screens and audit log. Also runs the login error on a mobile viewport |
 
@@ -324,7 +325,7 @@ To try protected endpoints in Swagger: call `POST /api/v1/auth/login`, click **A
 | `GET/PUT /api/v1/admin/users/{id}/balances` | admin | Yearly allowances |
 | `GET/POST /api/v1/admin/leave-types`, `PATCH …/{id}` | admin | Leave types |
 | `POST /api/v1/admin/holidays`, `PATCH/DELETE …/{id}` | admin | Public holidays |
-| `GET /api/v1/admin/audit-logs` | admin | Paginated, filterable audit log |
+| `GET /api/v1/admin/audit-logs?action=&actor_id=&start_date=&end_date=&page=` | admin | Paginated audit log, filterable by action, who and date range (days in the business timezone) |
 
 Status codes: `200`/`201`/`204` success · `400` business rule · `401` not logged in · `403` not allowed ·
 `404` not found · `409` conflict · `422` invalid input · `429` too many failed logins.
