@@ -15,11 +15,12 @@ const ALL: Role[] = ["employee", "manager", "admin"];
 // Visibility only - every endpoint is still authorised by the API.
 export const NAV_SECTIONS: { title: string; items: NavItem[] }[] = [
   {
-    title: "My leave",
+    title: "Home",
     items: [
       { to: "/", label: "Dashboard", roles: ALL },
-      { to: "/apply", label: "Apply for leave", roles: ALL },
-      { to: "/history", label: "My requests", roles: ALL },
+      // The admin (Director) does not request leave (decision D2).
+      { to: "/apply", label: "Apply for leave", roles: ["employee", "manager"] },
+      { to: "/history", label: "My requests", roles: ["employee", "manager"] },
     ],
   },
   {

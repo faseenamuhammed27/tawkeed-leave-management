@@ -39,6 +39,8 @@ async function apply(page: Page, range: { start: string; end: string }) {
   await expect(page.getByText("Leave request submitted and waiting for approval.")).toBeVisible();
 }
 
+const nav = (page: Page) => page.getByRole("navigation", { name: "Main" });
+
 const row = (page: Page, range: { start: string; end: string }) =>
   page.getByRole("row").filter({ hasText: formatRange(range.start, range.end) });
 
@@ -104,17 +106,19 @@ test("full leave workflow across employee, manager and admin", async ({ page }) 
   await expect(row(page, A).getByText("Cancelled", { exact: true })).toBeVisible();
   await logout(page);
 
-  // --- Admin: admin screens and the audit trail
+  // --- Admin (the Director): admin screens and the audit trail; no leave of their own (D2)
   await login(page, USERS.admin);
-  await page.getByRole("link", { name: "Users & managers" }).click();
+  await expect(page.getByRole("link", { name: "Apply for leave" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "My requests" })).toHaveCount(0);
+  await nav(page).getByRole("link", { name: "Users & managers" }).click();
   await expect(page.getByRole("cell", { name: "employee1@tawkeed.example" })).toBeVisible();
-  await page.getByRole("link", { name: "Leave types" }).click();
+  await nav(page).getByRole("link", { name: "Leave types" }).click();
   await expect(page.getByRole("cell", { name: "Annual Leave" })).toBeVisible();
-  await page.getByRole("link", { name: "Public holidays" }).click();
+  await nav(page).getByRole("link", { name: "Public holidays" }).click();
   await expect(page.getByRole("heading", { name: "Public holidays" })).toBeVisible();
-  await page.getByRole("link", { name: "Allowances" }).click();
+  await nav(page).getByRole("link", { name: "Allowances" }).click();
   await expect(page.getByRole("spinbutton", { name: "Annual Leave allocated days" })).toBeVisible();
-  await page.getByRole("link", { name: "Audit log" }).click();
+  await nav(page).getByRole("link", { name: "Audit log" }).click();
   await page.getByLabel("Filter by action").selectOption("leave_request.cancelled");
   await expect(page.getByRole("row").filter({ hasText: "Sara Ahmed" }).first()).toBeVisible();
 });

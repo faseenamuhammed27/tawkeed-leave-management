@@ -26,8 +26,8 @@ export function App() {
         }
       >
         <Route index element={<DashboardPage />} />
-        <Route path="apply" element={<ApplyLeavePage />} />
-        <Route path="history" element={<HistoryPage />} />
+        <Route path="apply" element={<RequireAuth roles={["employee", "manager"]}><ApplyLeavePage /></RequireAuth>} />
+        <Route path="history" element={<RequireAuth roles={["employee", "manager"]}><HistoryPage /></RequireAuth>} />
         <Route path="approvals" element={<RequireAuth roles={["manager", "admin"]}><ApprovalsPage /></RequireAuth>} />
         <Route path="calendar" element={<RequireAuth roles={["manager", "admin"]}><CalendarPage /></RequireAuth>} />
         <Route path="admin/users" element={<RequireAuth roles={["admin"]}><UsersPage /></RequireAuth>} />

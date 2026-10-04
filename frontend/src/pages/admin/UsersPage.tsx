@@ -33,6 +33,7 @@ export function UsersPage() {
     queryKey: ["admin-users", search, roleFilter],
     queryFn: () => adminApi.users({ search: search.trim() || undefined, role: roleFilter || undefined }),
   });
+  const admins = useQuery({ queryKey: ["admin-users", "admins"], queryFn: () => adminApi.users({ role: "admin" }) });
   const managers = useQuery({
     queryKey: ["admin-users", "managers"],
     queryFn: () => adminApi.users({ role: "manager", is_active: true }),
@@ -96,6 +97,8 @@ export function UsersPage() {
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => setForm((f) => ({ ...f, [key]: value }));
   const isNew = editing === "new";
   const isSelf = editing !== "new" && editing?.id === me?.id;
+  // Only one admin account (decision D2); the API enforces it, the form just explains it.
+  const adminTaken = (admins.data ?? []).some((a) => editing === "new" || a.id !== editing?.id);
 
   return (
     <>
@@ -205,8 +208,9 @@ export function UsersPage() {
               <Field label="Role" htmlFor="u-role" hint={isSelf ? "You cannot change your own role." : undefined}>
                 <select id="u-role" value={form.role} disabled={isSelf} onChange={(e) => set("role", e.target.value as Role)}>
                   {ROLES.map((r) => (
-                    <option key={r} value={r}>
+                    <option key={r} value={r} disabled={r === "admin" && adminTaken}>
                       {r[0].toUpperCase() + r.slice(1)}
+                      {r === "admin" && adminTaken ? " (only one admin)" : ""}
                     </option>
                   ))}
                 </select>

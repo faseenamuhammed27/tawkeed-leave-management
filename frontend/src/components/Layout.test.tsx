@@ -11,8 +11,9 @@ const links = () => screen.getAllByRole("link").map((a) => a.textContent);
 describe("role-based navigation (visibility only; the API enforces access)", () => {
   it.each<[Role, string[], string[]]>([
     ["employee", ["Dashboard", "Apply for leave", "My requests"], ["Approvals", "Team calendar", "Users & managers", "Audit log"]],
-    ["manager", ["Dashboard", "Approvals", "Team calendar"], ["Users & managers", "Allowances", "Audit log"]],
-    ["admin", ["Dashboard", "Approvals", "Team calendar", "Users & managers", "Allowances", "Leave types", "Public holidays", "Audit log"], []],
+    ["manager", ["Dashboard", "Apply for leave", "My requests", "Approvals", "Team calendar"], ["Users & managers", "Allowances", "Audit log"]],
+    // The admin (Director) does not request leave (decision D2).
+    ["admin", ["Dashboard", "Approvals", "Team calendar", "Users & managers", "Allowances", "Leave types", "Public holidays", "Audit log"], ["Apply for leave", "My requests"]],
   ])("%s sees the right menu", (role, visible, hidden) => {
     signIn(role);
     renderPage(<Layout />);
@@ -39,6 +40,12 @@ describe("RequireAuth", () => {
     renderPage(<RequireAuth roles={["admin"]}><div>admin page</div></RequireAuth>);
     expect(screen.getByText("You don't have access to this page")).toBeInTheDocument();
     expect(screen.queryByText("admin page")).not.toBeInTheDocument();
+  });
+
+  it("blocks the leave pages for the admin", () => {
+    signIn("admin");
+    renderPage(<RequireAuth roles={["employee", "manager"]}><div>apply form</div></RequireAuth>);
+    expect(screen.getByText("You don't have access to this page")).toBeInTheDocument();
   });
 
   it("allows the right role", () => {

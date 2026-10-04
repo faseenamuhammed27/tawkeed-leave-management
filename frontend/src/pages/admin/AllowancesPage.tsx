@@ -16,9 +16,11 @@ export function AllowancesPage() {
   const [flash, setFlash] = useState<string | null>(null);
 
   const users = useQuery({ queryKey: ["admin-users", "active"], queryFn: () => adminApi.users({ is_active: true }) });
+  // The admin does not take leave (decision D2), so only managers and employees have allowances.
+  const people = (users.data ?? []).filter((u) => u.role !== "admin");
   useEffect(() => {
-    if (userId === null && users.data?.length) setUserId(users.data[0].id);
-  }, [users.data, userId]);
+    if (userId === null && people.length) setUserId(people[0].id);
+  }, [people, userId]);
 
   const balances = useQuery({
     queryKey: ["admin-balances", userId, year],
@@ -41,7 +43,7 @@ export function AllowancesPage() {
     },
   });
 
-  const selectedName = users.data?.find((u) => u.id === userId)?.full_name;
+  const selectedName = people.find((u) => u.id === userId)?.full_name;
 
   return (
     <>
@@ -50,7 +52,7 @@ export function AllowancesPage() {
 
       <div className="toolbar">
         <select aria-label="Employee" value={userId ?? ""} onChange={(e) => setUserId(Number(e.target.value))}>
-          {(users.data ?? []).map((u) => (
+          {people.map((u) => (
             <option key={u.id} value={u.id}>
               {u.full_name} ({u.role})
             </option>

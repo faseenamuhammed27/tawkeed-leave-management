@@ -22,7 +22,7 @@ All demo accounts share one password, provided with the submission email (it is 
 
 | Role | Email | Notes |
 |---|---|---|
-| Admin | `admin@tawkeed.example` | Manages users, leave types, allowances, holidays; views audit log; approves the manager's leave |
+| Admin | `admin@tawkeed.example` | The Director: manages users, leave types, allowances, holidays; views the audit log; approves the manager's leave. Does not request leave |
 | Manager | `manager@tawkeed.example` | Manages Sara and Omar |
 | Employee | `employee1@tawkeed.example` | Sara Ahmed – has a pending request (2–3 Nov) for the manager to act on |
 | Employee | `employee2@tawkeed.example` | Omar Farooq – has an approved request (9–11 Nov) on the team calendar |
@@ -68,7 +68,7 @@ backend/
     models/            SQLAlchemy models with database constraints as a safety net
     schemas/           Pydantic request/response models (input validation)
     seed.py            idempotent demo data
-  alembic/             migrations (0001 initial schema)
+  alembic/             migrations (0001 initial schema, 0002 single admin)
   tests/               pytest suite (runs against a separate test database)
   scripts/smoke_test.py  end-to-end check of a running deployment
 frontend/
@@ -112,7 +112,7 @@ All rules are enforced by the API (and tested by calling it directly), not only 
 | 3 | No overlaps | Service check + DB exclusion constraint, across all leave types | 409 `OVERLAPPING_REQUEST` |
 | 4 | Valid dates | End ≥ start, start not in the past, within one calendar year | 422 |
 | 5 | Balance timing | `used_days` changes only on approval (+) and on cancelling approved leave (−) | — |
-| 6 | Approval rights | Employee's request → their own manager. Manager's/admin's request → an admin. Never yourself | 403 `NOT_YOUR_TEAM` / `SELF_APPROVAL_FORBIDDEN` |
+| 6 | Approval rights | Employee's request → their own manager. Manager's request → the admin. Never yourself (the admin does not request leave) | 403 `NOT_YOUR_TEAM` / `SELF_APPROVAL_FORBIDDEN` |
 | 7 | Audit trail | Create, approve, reject and cancel are written to `audit_logs` in the same transaction | — |
 
 Error responses always look like `{"detail": "human-readable message", "code": "MACHINE_CODE"}`.
@@ -170,9 +170,9 @@ The API's `CORS_ORIGINS` must include the frontend's address (`http://localhost:
 
 | Screen | Who | What it does |
 |---|---|---|
-| Dashboard | everyone | Balance cards per leave type (allocated, used, pending, available), recent requests, upcoming holidays; approvers see how many requests are waiting |
-| Apply for leave | everyone | Date pickers with a **live working-day count** from the API (`/leave-requests/preview`), holidays in range, balance warning; API errors shown in the form |
-| My requests | everyone | History with status filters; cancel own pending leave, or approved leave before it starts |
+| Dashboard | everyone | Employees and managers: balance cards (allocated, used, pending, available), recent requests, holidays, pending approvals. Admin: company overview and shortcuts |
+| Apply for leave | employee, manager | Date pickers with a **live working-day count** from the API (`/leave-requests/preview`), holidays in range, balance warning; API errors shown in the form |
+| My requests | employee, manager | History with status filters; cancel own pending leave, or approved leave before it starts |
 | Approvals | manager, admin | Team queue; approve (optional comment) or reject (**comment required**) |
 | Team calendar | manager, admin | Month view of approved leave with weekends and holidays marked; admins can cancel approved leave as a correction (reason required) |
 | Users & managers, Allowances, Leave types, Public holidays, Audit log | admin | Everything the admin API offers |
@@ -224,8 +224,8 @@ still in the future while the demo is reviewed. In the Docker image, `docker-ent
 
 | Suite | Tool | Tests | Result |
 |---|---|---|---|
-| Backend: business rules, permissions, auth/security, admin, seed | pytest + coverage | 312 | all passing, **97.5% line coverage** (CI gate: 70%) |
-| Frontend: components, API client, role-based UI | Vitest + Testing Library | 42 | all passing |
+| Backend: business rules, permissions, auth/security, admin, seed | pytest + coverage | 317 | all passing, **97.6% line coverage** (CI gate: 70%) |
+| Frontend: components, API client, role-based UI | Vitest + Testing Library | 45 | all passing |
 | End-to-end: full employee → manager → admin workflow in a real browser | Playwright | 3 | all passing (CI, local, and once against the live site) |
 | Deployment smoke test against a running API | `scripts/smoke_test.py` | 37 checks | all passing |
 
@@ -248,7 +248,7 @@ pytest --cov=app --cov-report=term-missing
 | `test_leave_rules.py` | One class per business rule 1–7, plus decisions D1–D5, visibility, team queue, calendar and database backstops |
 | `test_permissions.py` | Every protected endpoint × {anonymous, employee, manager, admin}: 401/403 as expected; a guard test fails if a new endpoint is not in the matrix |
 | `test_auth.py` | Login, identical errors for unknown email/wrong password, lockout and expiry, expired/forged/`alg=none` tokens, bcrypt storage, CORS, security headers |
-| `test_admin.py` | User management with the one-manager-level rules, allowances, leave types, holidays, audit log paging/filters, audit log is read-only |
+| `test_admin.py` | User management with the one-manager-level rules, single admin (API and database), allowances, leave types, holidays, audit log paging/filters, audit log is read-only |
 | `test_seed.py` | Seed is idempotent, sample requests are weeks in the future and stay within one year, locking the lockout-test account leaves the shared accounts working |
 | `test_working_days.py` | Working-day counter (weekends, holidays, holiday on weekend, month boundaries), preview endpoint, balance read model |
 
@@ -256,7 +256,7 @@ pytest --cov=app --cov-report=term-missing
 
 ```bash
 cd frontend
-npm test                      # Vitest + Testing Library (42 tests)
+npm test                      # Vitest + Testing Library (45 tests)
 npm run typecheck
 E2E_PASSWORD=<demo password> npm run e2e   # Playwright; needs the API and `npm run preview -- --port 5173` running
 ```
@@ -264,7 +264,8 @@ E2E_PASSWORD=<demo password> npm run e2e   # Playwright; needs the API and `npm 
 | File | Covers |
 |---|---|
 | `src/api/client.test.ts` | Bearer token, API error shape → readable messages, field validation errors, sign-out on 401, network errors |
-| `src/components/Layout.test.tsx` | Menu per role, route guards (signed out → login, wrong role → "no access") |
+| `src/components/Layout.test.tsx` | Menu per role (no leave menu for the admin), route guards (signed out → login, wrong role → "no access") |
+| `src/pages/DashboardPage.test.tsx` | Employee dashboard with balance cards; admin overview without balances or an apply button |
 | `src/pages/LoginPage.test.tsx` | Required fields, wrong password and lockout messages from the API, successful sign-in |
 | `src/pages/ApplyLeavePage.test.tsx` | Live working-day count from the API, balance warning, end-before-start, required fields, API refusal shown, successful submit |
 | `src/pages/ApprovalsPage.test.tsx` | Team queue, empty state, **reject disabled until a comment is entered**, approve, API refusal shown in the dialog |
@@ -299,14 +300,14 @@ To try protected endpoints in Swagger: call `POST /api/v1/auth/login`, click **A
 | `GET /api/v1/me/balances?year=` | any user | Allocated, used, pending and available days per leave type |
 | `GET /api/v1/leave-requests/preview?start_date=&end_date=&leave_type_id=` | any user | Live working-day count for the request form |
 | `GET /api/v1/leave-requests/mine?status=` | any user | Own leave history |
-| `POST /api/v1/leave-requests` | any user | Apply for leave (201) |
+| `POST /api/v1/leave-requests` | employee, manager | Apply for leave (201); the admin gets 403 (D2) |
 | `GET /api/v1/leave-requests/{id}` | owner, their manager, admin | One request |
 | `POST /api/v1/leave-requests/{id}/approve` | approver | Approve (optional comment) |
 | `POST /api/v1/leave-requests/{id}/reject` | approver | Reject (comment required) |
 | `POST /api/v1/leave-requests/{id}/cancel` | owner / admin | Cancel (see D3) |
 | `GET /api/v1/team/members`, `GET /api/v1/team/leave-requests?status=` | manager, admin | People and requests the caller approves |
 | `GET /api/v1/team/calendar?start_date=&end_date=` | manager, admin | Approved leave in a date range |
-| `GET/POST /api/v1/admin/users`, `GET/PATCH /api/v1/admin/users/{id}` | admin | Manage users and managers |
+| `GET/POST /api/v1/admin/users`, `GET/PATCH /api/v1/admin/users/{id}` | admin | Manage users and managers (only one admin account: 409 for a second) |
 | `GET/PUT /api/v1/admin/users/{id}/balances` | admin | Yearly allowances |
 | `GET/POST /api/v1/admin/leave-types`, `PATCH …/{id}` | admin | Leave types |
 | `POST /api/v1/admin/holidays`, `PATCH/DELETE …/{id}` | admin | Public holidays |
@@ -367,7 +368,7 @@ deliberately to keep the scope focused; each would be a natural next step.
 | Half-day and hourly leave | Whole days keep the working-day and balance rules unambiguous (decision D5) |
 | Requests spanning two calendar years | Balances are yearly; splitting year-end leave into two requests keeps each balance correct (D5) |
 | Carry-over of unused days and accrual during the year | Allowances are set per year by an admin; carry-over policies vary by company |
-| Multi-level approval chains | One manager level was chosen (D2); managers' leave goes to an admin |
+| Multi-level approval chains and multiple admins | One manager level and a single admin were chosen (D2); managers' leave goes to the admin |
 | Refresh tokens and HttpOnly-cookie sessions | Short-lived (30-minute) access tokens keep the auth flow simple; users sign in again after expiry |
 | Per-IP rate limiting | The required failed-login limit is implemented per account; IP-based limiting is better handled by a gateway or proxy in production |
 | Self-service password reset and email changes | Needs an email service; admins can reset passwords |
@@ -382,11 +383,12 @@ Where the brief left details open, these decisions were made:
   on approval (rule 5); pending requests just stop an employee from over-committing with several requests.
 - **D2 – Organisation model: one admin, one manager level.** Employees report to a manager; managers and the
   admin have no manager. Think of each **manager** as an office's HR lead, approving leave only for their own
-  office's staff, and the single **admin** as the Director, who manages the setup and approves the managers' leave.
-  The brief lists "everything an employee can do" for managers but not for admins, so the admin is treated as a
-  setup and oversight role and is not expected to request leave through the portal. The system still supports
-  more than one admin; an admin's own request would then need a different admin, because nobody can approve
-  their own leave.
+  office's staff, and the **admin** as the Director, who manages the setup and approves the managers' leave.
+  The brief lists "everything an employee can do" for managers but not for admins, so:
+  - **the admin does not request leave**: `POST /leave-requests` is limited to employees and managers (admin → 403),
+    and the admin has no leave menu, balances or allowances;
+  - **there is exactly one admin account**: creating or promoting a second admin returns 409
+    `ADMIN_ALREADY_EXISTS`, backed by a partial unique index in the database (migration `0002`).
 - **D3 – Cancellation.** Employees can cancel their own pending leave, or approved leave before it starts.
   Admins can cancel approved leave as an administrative correction (reason required). Managers cannot cancel.
   Nothing can be cancelled once it has started. Every cancellation is audited and restores used days if it was approved.
@@ -404,8 +406,6 @@ Where the brief left details open, these decisions were made:
 
 Known limitations:
 
-- With the single seeded admin, an admin's own leave request would stay pending (a second admin is needed);
-  by design the admin is not expected to request leave (see D2).
 - The lockout is per account, so someone could deliberately lock another user out for 15 minutes
   (use the `lockout-test` account to try it). Per-IP rate limiting would be the next step.
 - No refresh tokens: users sign in again after 30 minutes.
