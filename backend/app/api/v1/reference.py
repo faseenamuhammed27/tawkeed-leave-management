@@ -1,5 +1,6 @@
 """Read-only data every logged-in user needs: leave types, public holidays, own balances."""
 
+from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Query
@@ -7,6 +8,7 @@ from sqlalchemy import extract, select
 
 from app.api.deps import CurrentUser, DbSession
 from app.core import clock
+from app.core.errors import InvalidInputError
 from app.models import LeaveType, PublicHoliday
 from app.schemas.leave import BalanceOut, HolidayOut, LeaveTypeOut
 from app.services import balance_service
@@ -22,10 +24,23 @@ def list_active_leave_types(_: CurrentUser, db: DbSession) -> list[LeaveType]:
 
 
 @router.get("/holidays", response_model=list[HolidayOut])
-def list_holidays(_: CurrentUser, db: DbSession, year: Year = None) -> list[PublicHoliday]:
+def list_holidays(
+    _: CurrentUser,
+    db: DbSession,
+    year: Annotated[int | None, Query(ge=2000, le=2100, description="Only this year (all years if omitted)")] = None,
+    start_date: Annotated[date | None, Query(description="On or after this date")] = None,
+    end_date: Annotated[date | None, Query(description="On or before this date")] = None,
+) -> list[PublicHoliday]:
+    """Public holidays, oldest first. Year and date range can be combined."""
+    if start_date and end_date and end_date < start_date:
+        raise InvalidInputError("end_date cannot be before start_date")
     stmt = select(PublicHoliday).order_by(PublicHoliday.holiday_date)
     if year is not None:
         stmt = stmt.where(extract("year", PublicHoliday.holiday_date) == year)
+    if start_date is not None:
+        stmt = stmt.where(PublicHoliday.holiday_date >= start_date)
+    if end_date is not None:
+        stmt = stmt.where(PublicHoliday.holiday_date <= end_date)
     return list(db.scalars(stmt))
 
 

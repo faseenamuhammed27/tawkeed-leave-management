@@ -26,7 +26,8 @@ export const authApi = {
 
 export const referenceApi = {
   leaveTypes: () => api.get<LeaveType[]>(`${V1}/leave-types`),
-  holidays: (year?: number) => api.get<Holiday[]>(`${V1}/holidays`, { year }),
+  holidays: (year?: number, range: { start_date?: string; end_date?: string } = {}) =>
+    api.get<Holiday[]>(`${V1}/holidays`, { year, ...range }),
   myBalances: (year?: number) => api.get<Balance[]>(`${V1}/me/balances`, { year }),
 };
 

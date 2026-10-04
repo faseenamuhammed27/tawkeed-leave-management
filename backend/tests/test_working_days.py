@@ -104,3 +104,15 @@ class TestBalancesReadModel:
         r = client.get("/api/v1/holidays", params={"year": 2027}, headers=auth_headers(employee))
         assert [h["name"] for h in r.json()] == ["New Year"]
         assert len(client.get("/api/v1/holidays", headers=auth_headers(employee)).json()) == 2
+
+    def test_holidays_filter_by_date_range(self, client, employee, holiday):
+        holiday(date(2026, 11, 30), "A")
+        holiday(date(2026, 12, 2), "B")
+        holiday(date(2027, 1, 1), "C")
+        names = lambda **p: [h["name"] for h in client.get("/api/v1/holidays", params=p, headers=auth_headers(employee)).json()]
+        assert names(start_date="2026-12-01") == ["B", "C"]
+        assert names(end_date="2026-12-02") == ["A", "B"]
+        assert names(start_date="2026-12-01", end_date="2026-12-31") == ["B"]
+        assert names(year=2026, start_date="2026-12-01") == ["B"]          # combined with the year
+        r = client.get("/api/v1/holidays", params={"start_date": "2026-12-31", "end_date": "2026-12-01"}, headers=auth_headers(employee))
+        assert r.status_code == 422

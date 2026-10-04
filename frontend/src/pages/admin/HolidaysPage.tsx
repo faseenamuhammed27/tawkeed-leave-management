@@ -10,14 +10,21 @@ import { formatDate, todayISO } from "../../lib/dates";
 export function HolidaysPage() {
   const thisYear = Number(todayISO().slice(0, 4));
   const queryClient = useQueryClient();
-  const [year, setYear] = useState(thisYear);
+  const [year, setYear] = useState<number | "">(thisYear);
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const extraFilters = Boolean(startDate || endDate || year !== thisYear);
   const [editing, setEditing] = useState<Holiday | "new" | null>(null);
   const [deleting, setDeleting] = useState<Holiday | null>(null);
   const [date, setDate] = useState("");
   const [name, setName] = useState("");
   const [flash, setFlash] = useState<string | null>(null);
 
-  const holidays = useQuery({ queryKey: ["holidays", year], queryFn: () => referenceApi.holidays(year) });
+  const holidays = useQuery({
+    queryKey: ["holidays", "admin", year, startDate, endDate],
+    queryFn: () =>
+      referenceApi.holidays(year || undefined, { start_date: startDate || undefined, end_date: endDate || undefined }),
+  });
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["holidays"] });
 
   const save = useMutation({
@@ -65,14 +72,31 @@ export function HolidaysPage() {
         }
       />
       {flash && <Alert kind="success">{flash}</Alert>}
-      <div className="toolbar">
-        <select aria-label="Year" value={year} onChange={(e) => setYear(Number(e.target.value))}>
+      <div className="toolbar" role="group" aria-label="Filters">
+        <select aria-label="Year" value={year} onChange={(e) => setYear(e.target.value ? Number(e.target.value) : "")}>
+          <option value="">All years</option>
           {[thisYear - 1, thisYear, thisYear + 1].map((y) => (
             <option key={y} value={y}>
               {y}
             </option>
           ))}
         </select>
+        <input type="date" aria-label="From date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+        <input type="date" aria-label="To date" min={startDate || undefined} value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+        {extraFilters && (
+          <button
+            type="button"
+            className="btn btn-small btn-ghost"
+            onClick={() => {
+              setYear(thisYear);
+              setStartDate("");
+              setEndDate("");
+            }}
+          >
+            Clear filters
+          </button>
+        )}
+        {holidays.data && <span className="muted small">{holidays.data.length} holiday{holidays.data.length === 1 ? "" : "s"}</span>}
       </div>
 
       {holidays.isPending && <Spinner />}
@@ -111,7 +135,7 @@ export function HolidaysPage() {
             </table>
           </div>
         ) : (
-          <EmptyState title={`No public holidays in ${year}`} />
+          <EmptyState title={startDate || endDate || !year ? "No public holidays match these filters" : `No public holidays in ${year}`} />
         ))}
 
       {editing && (
