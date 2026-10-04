@@ -80,6 +80,7 @@ export function AllowancesPage() {
               </caption>
               <thead>
                 <tr>
+                  <th className="row-num">#</th>
                   <th>Leave type</th>
                   <th className="num">Used</th>
                   <th className="num">Pending</th>
@@ -88,7 +89,7 @@ export function AllowancesPage() {
                 </tr>
               </thead>
               <tbody>
-                {balances.data.map((b) => {
+                {balances.data.map((b, i) => {
                   const draft = drafts[b.leave_type_id];
                   const value = draft ?? String(b.allocated_days);
                   const n = Number(value);
@@ -96,6 +97,7 @@ export function AllowancesPage() {
                   const changed = draft !== undefined && n !== b.allocated_days;
                   return (
                     <tr key={b.leave_type_id}>
+                      <td data-label="#" className="row-num">{i + 1}</td>
                       <td data-label="Leave type">{b.leave_type_name}</td>
                       <td data-label="Used" className="num">{b.used_days}</td>
                       <td data-label="Pending" className="num">{b.pending_days}</td>

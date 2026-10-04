@@ -115,4 +115,14 @@ describe("HistoryPage", () => {
       expect(q.get("leave_type_id")).toBeNull();
     });
   });
+
+  it("numbers the rows", async () => {
+    signIn("employee");
+    mockApi({ [`GET ${API}/leave-types`]: TYPES, [`GET ${API}/leave-requests/mine`]: [{ ...base, id: 1 }, { ...base, id: 2, start_date: "2030-04-01", end_date: "2030-04-01" }] });
+    renderPage(<HistoryPage />);
+    const table = await screen.findByRole("table");
+    expect(within(table).getByRole("columnheader", { name: "#" })).toBeInTheDocument();
+    const rows = within(table).getAllByRole("row").slice(1);
+    expect(rows.map((r) => within(r).getAllByRole("cell")[0].textContent)).toEqual(["1", "2"]);
+  });
 });

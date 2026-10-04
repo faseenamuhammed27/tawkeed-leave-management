@@ -116,6 +116,7 @@ export function AuditLogPage() {
               <table className="table">
                 <thead>
                   <tr>
+                    <th className="row-num">#</th>
                     <th>When</th>
                     <th>Who</th>
                     <th>Action</th>
@@ -124,8 +125,9 @@ export function AuditLogPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {logs.data.items.map((l) => (
+                  {logs.data.items.map((l, i) => (
                     <tr key={l.id}>
+                      <td data-label="#" className="row-num">{(page - 1) * PAGE_SIZE + i + 1}</td>
                       <td data-label="When" className="nowrap">{formatDateTime(l.created_at)}</td>
                       <td data-label="Who">{l.actor_name ?? "System"}</td>
                       <td data-label="Action">

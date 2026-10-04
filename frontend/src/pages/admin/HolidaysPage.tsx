@@ -83,14 +83,16 @@ export function HolidaysPage() {
             <table className="table">
               <thead>
                 <tr>
+                  <th className="row-num">#</th>
                   <th>Date</th>
                   <th>Name</th>
                   <th className="actions-col">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {holidays.data.map((h) => (
+                {holidays.data.map((h, i) => (
                   <tr key={h.id}>
+                    <td data-label="#" className="row-num">{i + 1}</td>
                     <td data-label="Date">{formatDate(h.holiday_date)}</td>
                     <td data-label="Name">{h.name}</td>
                     <td data-label="Actions" className="actions-col">

@@ -235,7 +235,7 @@ still in the future while the demo is reviewed. In the Docker image, `docker-ent
 | Suite | Tool | Tests | Result |
 |---|---|---|---|
 | Backend: business rules, permissions, auth/security, admin, seed | pytest + coverage | 340 | all passing, **97.6% line coverage** (CI gate: 70%) |
-| Frontend: components, API client, role-based UI | Vitest + Testing Library | 60 | all passing |
+| Frontend: components, API client, role-based UI | Vitest + Testing Library | 62 | all passing |
 | End-to-end: full employee → manager → admin workflow in a real browser | Playwright | 3 | all passing (CI, local, and once against the live site) |
 | Deployment smoke test against a running API | `scripts/smoke_test.py` | 37 checks | all passing |
 
@@ -266,7 +266,7 @@ pytest --cov=app --cov-report=term-missing
 
 ```bash
 cd frontend
-npm test                      # Vitest + Testing Library (60 tests)
+npm test                      # Vitest + Testing Library (62 tests)
 npm run typecheck
 E2E_PASSWORD=<demo password> npm run e2e   # Playwright; needs the API and `npm run preview -- --port 5173` running
 ```

@@ -64,6 +64,7 @@ export function LeaveTypesPage() {
             <table className="table">
               <thead>
                 <tr>
+                  <th className="row-num">#</th>
                   <th>Code</th>
                   <th>Name</th>
                   <th className="num">Default days / year</th>
@@ -72,8 +73,9 @@ export function LeaveTypesPage() {
                 </tr>
               </thead>
               <tbody>
-                {types.data.map((t) => (
+                {types.data.map((t, i) => (
                   <tr key={t.id} className={t.is_active ? "" : "row-muted"}>
+                    <td data-label="#" className="row-num">{i + 1}</td>
                     <td data-label="Code">
                       <code>{t.code}</code>
                     </td>

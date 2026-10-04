@@ -25,6 +25,7 @@ export function RequestTable({
         {caption && <caption className="sr-only">{caption}</caption>}
         <thead>
           <tr>
+            <th className="row-num">#</th>
             {showEmployee && <th>Employee</th>}
             {showRole && <th>Role</th>}
             <th>Type</th>
@@ -36,8 +37,9 @@ export function RequestTable({
           </tr>
         </thead>
         <tbody>
-          {requests.map((r) => (
+          {requests.map((r, i) => (
             <tr key={r.id}>
+              <td data-label="#" className="row-num">{i + 1}</td>
               {showEmployee && (
                 <td data-label="Employee">
                   <span className="name-with-badge">

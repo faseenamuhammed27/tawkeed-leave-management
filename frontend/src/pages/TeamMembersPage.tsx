@@ -89,6 +89,7 @@ export function TeamMembersPage() {
               <caption className="sr-only">Leave overview per person, {year}</caption>
               <thead>
                 <tr>
+                  <th className="row-num">#</th>
                   <th>Name</th>
                   {isAdmin && <th>Role</th>}
                   {isAdmin && <th>Manager</th>}
@@ -100,8 +101,9 @@ export function TeamMembersPage() {
                 </tr>
               </thead>
               <tbody>
-                {summary.data.map((m) => (
+                {summary.data.map((m, i) => (
                   <tr key={m.id}>
+                    <td data-label="#" className="row-num">{i + 1}</td>
                     <td data-label="Name">
                       <div>{m.full_name}</div>
                       <div className="muted small">{m.email}</div>

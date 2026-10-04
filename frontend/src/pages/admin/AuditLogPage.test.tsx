@@ -47,4 +47,21 @@ describe("AuditLogPage", () => {
     renderPage(<AuditLogPage />);
     expect(await screen.findByText("No audit entries")).toBeInTheDocument();
   });
+
+  it("continues row numbers across pages", async () => {
+    signIn("admin");
+    const items = Array.from({ length: 25 }, (_, k) => ({ ...ENTRY, id: 100 - k }));
+    mockApi({
+      [`GET ${API}/admin/audit-logs`]: ({ url }: { url: URL }) => ({
+        body: { items: url.searchParams.get("page") === "2" ? [{ ...ENTRY, id: 1 }] : items, total: 26, page: Number(url.searchParams.get("page")), page_size: 25 },
+      }),
+      [`GET ${API}/admin/users`]: [USERS.admin],
+    });
+    renderPage(<AuditLogPage />);
+    await screen.findAllByText("Khalid Rahman", { selector: "td" });
+    await userEvent.click(screen.getByRole("button", { name: /Older/ }));
+    await waitFor(() => expect(screen.getByText("Page 2 of 2")).toBeInTheDocument());
+    const firstCell = screen.getAllByRole("row")[1].querySelector("td")!;
+    expect(firstCell.textContent).toBe("26");
+  });
 });

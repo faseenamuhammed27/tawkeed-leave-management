@@ -142,6 +142,7 @@ export function UsersPage() {
             <table className="table">
               <thead>
                 <tr>
+                  <th className="row-num">#</th>
                   <th>Name</th>
                   <th>Email</th>
                   <th>Role</th>
@@ -151,8 +152,9 @@ export function UsersPage() {
                 </tr>
               </thead>
               <tbody>
-                {users.data.map((u) => (
+                {users.data.map((u, i) => (
                   <tr key={u.id} className={u.is_active ? "" : "row-muted"}>
+                    <td data-label="#" className="row-num">{i + 1}</td>
                     <td data-label="Name">{u.full_name}</td>
                     <td data-label="Email">{u.email}</td>
                     <td data-label="Role">
