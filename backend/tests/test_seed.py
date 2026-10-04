@@ -30,6 +30,15 @@ def test_creates_demo_accounts_including_lockout_test(db, seeded):
     assert lockout.manager_id == users["manager@tawkeed.example"].id
 
 
+def test_single_admin_without_leave_balances(db, seeded):
+    """D2: one admin (the Director), who does not take leave, so no balances are seeded for them."""
+    from app.models import LeaveBalance
+
+    admins = db.scalars(select(User).where(User.role == UserRole.ADMIN)).all()
+    assert len(admins) == 1
+    assert db.scalars(select(LeaveBalance).where(LeaveBalance.user_id == admins[0].id)).all() == []
+
+
 def test_sample_requests_are_weeks_in_the_future(db, seeded):
     requests = {r.status: r for r in db.scalars(select(LeaveRequest))}
     pending, approved = requests[LeaveStatus.PENDING], requests[LeaveStatus.APPROVED]

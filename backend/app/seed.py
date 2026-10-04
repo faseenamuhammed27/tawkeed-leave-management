@@ -115,7 +115,7 @@ def seed(db: Session) -> list[str]:
     log += [f"user {lockout_user.email}"] if created else []
 
     year = clock.today().year
-    for user in (admin, manager, *employees, lockout_user):
+    for user in (manager, *employees, lockout_user):  # the admin does not take leave (D2)
         for lt in types.values():
             has_row = db.scalar(select(exists().where(
                 LeaveBalance.user_id == user.id, LeaveBalance.leave_type_id == lt.id, LeaveBalance.year == year)))

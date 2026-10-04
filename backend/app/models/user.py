@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Integer, String, text
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, String, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin
@@ -10,8 +10,9 @@ from app.models.enums import UserRole, pg_enum
 class User(TimestampMixin, Base):
     """An employee, manager or admin.
 
-    One manager level only: employees must have a manager; managers and admins never do.
+    One manager level only: employees must have a manager; managers and the admin never do.
     That the referenced user really is a manager is enforced in the service layer.
+    There is exactly one admin account (the Director); a partial unique index enforces it.
     """
 
     __tablename__ = "users"
@@ -24,6 +25,7 @@ class User(TimestampMixin, Base):
             name="manager_only_for_employees",
         ),
         CheckConstraint("failed_login_count >= 0", name="failed_login_count_non_negative"),
+        Index("uq_users_single_admin", "role", unique=True, postgresql_where=text("role = 'admin'")),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)

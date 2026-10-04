@@ -10,6 +10,7 @@ from app.models import UserRole
 from tests.conftest import auth_headers
 
 EVERYONE = {"employee", "manager", "admin"}
+REQUESTERS = {"employee", "manager"}  # the admin does not request leave (D2)
 MANAGERS = {"manager", "admin"}
 ADMINS = {"admin"}
 
@@ -21,7 +22,7 @@ ENDPOINTS = [
     ("GET", "/api/v1/me/balances", EVERYONE),
     ("GET", "/api/v1/leave-requests/preview?start_date=2026-03-09&end_date=2026-03-10", EVERYONE),
     ("GET", "/api/v1/leave-requests/mine", EVERYONE),
-    ("POST", "/api/v1/leave-requests", EVERYONE),
+    ("POST", "/api/v1/leave-requests", REQUESTERS),
     ("GET", "/api/v1/leave-requests/999999", EVERYONE),
     ("POST", "/api/v1/leave-requests/999999/cancel", EVERYONE),
     ("POST", "/api/v1/leave-requests/999999/approve", MANAGERS),

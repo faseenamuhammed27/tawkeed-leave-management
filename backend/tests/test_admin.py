@@ -29,9 +29,34 @@ class TestUserManagement:
         r = client.post("/api/v1/auth/login", json={"email": "mixed.case@tawkeed.example", "password": "Str0ng-Passw0rd"})
         assert r.status_code == 200
 
-    def test_create_manager_and_admin_without_manager(self, client, admin):
+    def test_create_manager_without_manager(self, client, admin):
         assert create_user(client, admin, role="manager", email="m@tawkeed.example").status_code == 201
-        assert create_user(client, admin, role="admin", email="a@tawkeed.example").status_code == 201
+
+    def test_second_admin_cannot_be_created(self, client, admin):
+        """D2: exactly one admin account."""
+        r = create_user(client, admin, role="admin", email="a2@tawkeed.example")
+        assert r.status_code == 409
+        assert r.json()["code"] == "ADMIN_ALREADY_EXISTS"
+
+    def test_cannot_promote_someone_to_second_admin(self, client, admin, employee):
+        r = client.patch(f"{USERS}/{employee.id}", json={"role": "admin", "manager_id": None}, headers=auth_headers(admin))
+        assert r.status_code == 409
+        assert r.json()["code"] == "ADMIN_ALREADY_EXISTS"
+
+    def test_admin_can_still_edit_own_details(self, client, admin):
+        r = client.patch(f"{USERS}/{admin.id}", json={"full_name": "Aisha Director"}, headers=auth_headers(admin))
+        assert r.status_code == 200
+        assert r.json()["role"] == "admin"
+
+    def test_database_rejects_a_second_admin(self, db, admin):
+        from sqlalchemy.exc import IntegrityError
+
+        from app.models import User
+
+        with pytest.raises(IntegrityError, match="uq_users_single_admin"):
+            with db.begin_nested():
+                db.add(User(email="x@tawkeed.example", full_name="X", password_hash="h", role=UserRole.ADMIN))
+                db.flush()
 
     def test_employee_requires_manager(self, client, admin):
         r = create_user(client, admin)
@@ -243,11 +268,13 @@ class TestAuditLog:
         page = client.get("/api/v1/admin/audit-logs", params={"page": 2, "page_size": 2}, headers=auth_headers(admin)).json()
         assert (page["total"], page["page"], len(page["items"])) == (5, 2, 2)
 
-    def test_filter_by_actor(self, client, admin, admin2):
+    def test_filter_by_actor(self, client, admin, manager, employee, annual):
         client.post("/api/v1/admin/holidays", json={"holiday_date": "2026-11-02", "name": "A"}, headers=auth_headers(admin))
-        client.post("/api/v1/admin/holidays", json={"holiday_date": "2026-11-03", "name": "B"}, headers=auth_headers(admin2))
-        page = client.get("/api/v1/admin/audit-logs", params={"actor_id": admin2.id}, headers=auth_headers(admin)).json()
-        assert [i["details"]["name"] for i in page["items"]] == ["B"]
+        req = client.post("/api/v1/leave-requests", json={"leave_type_id": annual.id, "start_date": "2026-03-09",
+                                                           "end_date": "2026-03-10"}, headers=auth_headers(employee)).json()
+        client.post(f"/api/v1/leave-requests/{req['id']}/approve", headers=auth_headers(manager))
+        page = client.get("/api/v1/admin/audit-logs", params={"actor_id": manager.id}, headers=auth_headers(admin)).json()
+        assert [i["action"] for i in page["items"]] == ["leave_request.approved"]
 
     def test_audit_log_cannot_be_modified(self, client, admin):
         for method in ("post", "put", "patch", "delete"):

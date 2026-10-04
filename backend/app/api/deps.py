@@ -51,4 +51,6 @@ def require_roles(*roles: UserRole) -> Callable[[User], User]:
 
 
 ManagerOrAdmin = Annotated[User, Depends(require_roles(UserRole.MANAGER, UserRole.ADMIN))]
+# Leave is requested by employees and managers; the admin (Director) is a setup role only.
+LeaveRequester = Annotated[User, Depends(require_roles(UserRole.EMPLOYEE, UserRole.MANAGER))]
 AdminUser = Annotated[User, Depends(require_roles(UserRole.ADMIN))]

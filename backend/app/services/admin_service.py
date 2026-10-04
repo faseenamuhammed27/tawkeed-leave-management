@@ -51,6 +51,15 @@ def _validate_manager(db: Session, role: UserRole, manager_id: int | None, user_
         raise BusinessRuleError("manager_id must refer to an active user with the manager role", "INVALID_MANAGER")
 
 
+def _ensure_no_other_admin(db: Session, user_id: int | None = None) -> None:
+    """D2: there is exactly one admin account (the Director)."""
+    stmt = select(exists().where(User.role == UserRole.ADMIN))
+    if user_id is not None:
+        stmt = select(exists().where(User.role == UserRole.ADMIN, User.id != user_id))
+    if db.scalar(stmt):
+        raise ConflictError("There can only be one admin account", "ADMIN_ALREADY_EXISTS")
+
+
 def _has_team(db: Session, manager_id: int) -> bool:
     return bool(db.scalar(select(exists().where(User.manager_id == manager_id))))
 
@@ -75,6 +84,8 @@ def create_user(db: Session, actor: User, data: UserCreate) -> User:
     if db.scalar(select(exists().where(User.email == data.email))):
         raise ConflictError("A user with this email already exists", "EMAIL_TAKEN")
     _validate_manager(db, data.role, data.manager_id)
+    if data.role == UserRole.ADMIN:
+        _ensure_no_other_admin(db)
 
     user = User(
         email=data.email, full_name=data.full_name, password_hash=hash_password(data.password),
@@ -107,6 +118,8 @@ def update_user(db: Session, actor: User, user_id: int, data: UserUpdate) -> Use
     if user.role == UserRole.MANAGER and (new_role != UserRole.MANAGER or deactivating) and _has_team(db, user.id):
         raise BusinessRuleError("Reassign this manager's team members first", "MANAGER_HAS_TEAM")
     _validate_manager(db, new_role, new_manager_id, user.id)
+    if new_role == UserRole.ADMIN and user.role != UserRole.ADMIN:
+        _ensure_no_other_admin(db, user.id)
 
     changes: dict[str, Any] = {}
 

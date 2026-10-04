@@ -185,6 +185,8 @@ def calendar(db: Session, actor: User, start: date, end: date) -> Sequence[Leave
 # ------------------------------------------------------------------ commands
 
 def create_request(db: Session, user: User, data: LeaveRequestCreate) -> LeaveRequest:
+    if user.role == UserRole.ADMIN:  # D2: the admin is a setup role and does not request leave
+        raise PermissionDeniedError("The admin account does not request leave", "ADMIN_CANNOT_REQUEST_LEAVE")
     leave_type = db.get(LeaveType, data.leave_type_id)
     if leave_type is None:
         raise NotFoundError("Leave type not found", "LEAVE_TYPE_NOT_FOUND")

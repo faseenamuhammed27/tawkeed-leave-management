@@ -333,15 +333,22 @@ class TestRule6ApprovalRights:
         req = submit(client, other_manager, annual, date(2026, 3, 9), date(2026, 3, 10)).json()
         assert approve(client, manager, req["id"]).status_code == 403
 
-    def test_admin_cannot_approve_own_request(self, client, admin, annual):
-        req = submit(client, admin, annual, date(2026, 3, 9), date(2026, 3, 10)).json()
-        r = approve(client, admin, req["id"])
+    def test_admin_cannot_request_leave(self, client, db, admin, annual):
+        """D2: the admin (Director) is a setup role and does not request leave."""
+        r = submit(client, admin, annual, date(2026, 3, 9), date(2026, 3, 10))
         assert r.status_code == 403
-        assert r.json()["code"] == "SELF_APPROVAL_FORBIDDEN"
+        assert db.scalars(select(LeaveRequest).where(LeaveRequest.employee_id == admin.id)).all() == []
 
-    def test_admin_request_is_approved_by_another_admin(self, client, admin, admin2, annual):
-        req = submit(client, admin, annual, date(2026, 3, 9), date(2026, 3, 10)).json()
-        assert approve(client, admin2, req["id"]).status_code == 200
+    def test_service_also_refuses_admin_leave(self, db, admin, annual):
+        """Defence in depth: the service refuses even if the route check were bypassed."""
+        from app.core.errors import PermissionDeniedError
+        from app.schemas.leave import LeaveRequestCreate
+        from app.services import leave_service
+
+        with pytest.raises(PermissionDeniedError) as exc:
+            leave_service.create_request(db, admin, LeaveRequestCreate(
+                leave_type_id=annual.id, start_date=date(2026, 3, 9), end_date=date(2026, 3, 10)))
+        assert exc.value.code == "ADMIN_CANNOT_REQUEST_LEAVE"
 
     def test_cannot_decide_twice(self, client, manager, approved):
         assert approve(client, manager, approved["id"]).status_code == 409

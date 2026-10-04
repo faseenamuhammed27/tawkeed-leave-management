@@ -2,7 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Body, Query, status
 
-from app.api.deps import CurrentUser, DbSession, ManagerOrAdmin
+from app.api.deps import CurrentUser, DbSession, LeaveRequester, ManagerOrAdmin
 from app.core import clock
 from app.core.errors import NotFoundError
 from app.models import LeaveStatus, LeaveType
@@ -60,8 +60,10 @@ def my_requests(user: CurrentUser, db: DbSession, status_filter: Annotated[Leave
 
 
 @router.post("", response_model=LeaveRequestOut, status_code=status.HTTP_201_CREATED, responses=_E)
-def create_request(body: LeaveRequestCreate, user: CurrentUser, db: DbSession):
-    """Apply for leave. Enforces working days, balance (incl. pending), overlaps and valid dates."""
+def create_request(body: LeaveRequestCreate, user: LeaveRequester, db: DbSession):
+    """Apply for leave (employees and managers; the admin does not request leave).
+
+    Enforces working days, balance (incl. pending), overlaps and valid dates."""
     return LeaveRequestOut.from_model(leave_service.create_request(db, user, body))
 
 

@@ -124,11 +124,6 @@ def admin(make_user) -> User:
 
 
 @pytest.fixture
-def admin2(make_user) -> User:
-    return make_user(UserRole.ADMIN, full_name="Second Admin")
-
-
-@pytest.fixture
 def manager(make_user) -> User:
     return make_user(UserRole.MANAGER, full_name="Maya Manager")
 
