@@ -22,7 +22,7 @@ All demo accounts share one password, provided with the submission email (it is 
 
 | Role | Email | Notes |
 |---|---|---|
-| Admin | `admin@tawkeed.example` | The Director: manages users, leave types, allowances, holidays; views the audit log; approves the manager's leave. Does not request leave |
+| Admin | `admin@tawkeed.example` | The Director: manages users, leave types, allowances, holidays; views the audit log; can approve or reject any request (managers' requests come to them). Does not request leave |
 | Manager | `manager@tawkeed.example` | Manages Sara and Omar |
 | Employee | `employee1@tawkeed.example` | Sara Ahmed – has a pending request (2–3 Nov) for the manager to act on |
 | Employee | `employee2@tawkeed.example` | Omar Farooq – has an approved request (9–11 Nov) on the team calendar |
@@ -112,7 +112,7 @@ All rules are enforced by the API (and tested by calling it directly), not only 
 | 3 | No overlaps | Service check + DB exclusion constraint, across all leave types | 409 `OVERLAPPING_REQUEST` |
 | 4 | Valid dates | End ≥ start, start not in the past, within one calendar year | 422 |
 | 5 | Balance timing | `used_days` changes only on approval (+) and on cancelling approved leave (−) | — |
-| 6 | Approval rights | Employee's request → their own manager. Manager's request → the admin. Never yourself (the admin does not request leave) | 403 `NOT_YOUR_TEAM` / `SELF_APPROVAL_FORBIDDEN` |
+| 6 | Approval rights | Managers act only on their own team's requests. The admin (Director) can act on any request; managers' requests go to the admin. Never yourself | 403 `NOT_YOUR_TEAM` / `SELF_APPROVAL_FORBIDDEN` | 403 `NOT_YOUR_TEAM` / `SELF_APPROVAL_FORBIDDEN` |
 | 7 | Audit trail | Create, approve, reject and cancel are written to `audit_logs` in the same transaction | — |
 
 Error responses always look like `{"detail": "human-readable message", "code": "MACHINE_CODE"}`.
@@ -170,10 +170,10 @@ The API's `CORS_ORIGINS` must include the frontend's address (`http://localhost:
 
 | Screen | Who | What it does |
 |---|---|---|
-| Dashboard | everyone | Employees and managers: balance cards (allocated, used, pending, available), recent requests, holidays, pending approvals. Admin: company overview and shortcuts |
+| Dashboard | everyone | Employees and managers: balance cards (allocated, used, pending, available), recent requests, holidays, pending approvals. Admin: manager and employee counts, and Pending / Approved / Rejected widgets broken down by leave type for **this month or this year**; each widget opens the filtered list |
 | Apply for leave | employee, manager | Date pickers with a **live working-day count** from the API (`/leave-requests/preview`), holidays in range, balance warning; API errors shown in the form |
 | My requests | employee, manager | History with status filters; cancel own pending leave, or approved leave before it starts |
-| Approvals | manager, admin | Team queue; approve (optional comment) or reject (**comment required**) |
+| Approvals | manager, admin | Queue with filters for status, leave type, person, date range (and role, for the admin), kept in the URL; approve (optional comment) or reject (**comment required**) |
 | Team calendar | manager, admin | Month view of approved leave with weekends and holidays marked; admins can cancel approved leave as a correction (reason required) |
 | Users & managers, Allowances, Leave types, Public holidays, Audit log | admin | Everything the admin API offers |
 
@@ -224,8 +224,8 @@ still in the future while the demo is reviewed. In the Docker image, `docker-ent
 
 | Suite | Tool | Tests | Result |
 |---|---|---|---|
-| Backend: business rules, permissions, auth/security, admin, seed | pytest + coverage | 317 | all passing, **97.6% line coverage** (CI gate: 70%) |
-| Frontend: components, API client, role-based UI | Vitest + Testing Library | 45 | all passing |
+| Backend: business rules, permissions, auth/security, admin, seed | pytest + coverage | 326 | all passing, **97.6% line coverage** (CI gate: 70%) |
+| Frontend: components, API client, role-based UI | Vitest + Testing Library | 48 | all passing |
 | End-to-end: full employee → manager → admin workflow in a real browser | Playwright | 3 | all passing (CI, local, and once against the live site) |
 | Deployment smoke test against a running API | `scripts/smoke_test.py` | 37 checks | all passing |
 
@@ -245,7 +245,7 @@ pytest --cov=app --cov-report=term-missing
 
 | File | Covers |
 |---|---|
-| `test_leave_rules.py` | One class per business rule 1–7, plus decisions D1–D5, visibility, team queue, calendar and database backstops |
+| `test_leave_rules.py` | One class per business rule 1–7, plus decisions D1–D5, visibility, team queue and its filters, calendar and database backstops |
 | `test_permissions.py` | Every protected endpoint × {anonymous, employee, manager, admin}: 401/403 as expected; a guard test fails if a new endpoint is not in the matrix |
 | `test_auth.py` | Login, identical errors for unknown email/wrong password, lockout and expiry, expired/forged/`alg=none` tokens, bcrypt storage, CORS, security headers |
 | `test_admin.py` | User management with the one-manager-level rules, single admin (API and database), allowances, leave types, holidays, audit log paging/filters, audit log is read-only |
@@ -256,7 +256,7 @@ pytest --cov=app --cov-report=term-missing
 
 ```bash
 cd frontend
-npm test                      # Vitest + Testing Library (45 tests)
+npm test                      # Vitest + Testing Library (48 tests)
 npm run typecheck
 E2E_PASSWORD=<demo password> npm run e2e   # Playwright; needs the API and `npm run preview -- --port 5173` running
 ```
@@ -265,10 +265,10 @@ E2E_PASSWORD=<demo password> npm run e2e   # Playwright; needs the API and `npm 
 |---|---|
 | `src/api/client.test.ts` | Bearer token, API error shape → readable messages, field validation errors, sign-out on 401, network errors |
 | `src/components/Layout.test.tsx` | Menu per role (no leave menu for the admin), route guards (signed out → login, wrong role → "no access") |
-| `src/pages/DashboardPage.test.tsx` | Employee dashboard with balance cards; admin overview without balances or an apply button |
+| `src/pages/DashboardPage.test.tsx` | Employee dashboard with balance cards; admin widgets by status and leave type, links to filtered lists, month/year switch, no personal balances |
 | `src/pages/LoginPage.test.tsx` | Required fields, wrong password and lockout messages from the API, successful sign-in |
 | `src/pages/ApplyLeavePage.test.tsx` | Live working-day count from the API, balance warning, end-before-start, required fields, API refusal shown, successful submit |
-| `src/pages/ApprovalsPage.test.tsx` | Team queue, empty state, **reject disabled until a comment is entered**, approve, API refusal shown in the dialog |
+| `src/pages/ApprovalsPage.test.tsx` | Queue, empty state, **reject disabled until a comment is entered**, approve, API refusal shown, filters read from the URL and sent to the API, no role filter for managers |
 | `src/pages/HistoryPage.test.tsx` | Status and decision details, cancel only where allowed, cancel flow, API refusal, empty and error states |
 | `src/lib/dates.test.ts` | Asia/Dubai "today", month grid, date ranges |
 | `e2e/leave-workflow.spec.ts` | Real browser against the real API: employee applies (live count, overlap refused, admin pages blocked) → manager approves one and rejects one with a comment → calendar shows the approved leave → employee sees the decisions and cancels → admin screens and audit log. Also runs the login error on a mobile viewport |
@@ -302,10 +302,11 @@ To try protected endpoints in Swagger: call `POST /api/v1/auth/login`, click **A
 | `GET /api/v1/leave-requests/mine?status=` | any user | Own leave history |
 | `POST /api/v1/leave-requests` | employee, manager | Apply for leave (201); the admin gets 403 (D2) |
 | `GET /api/v1/leave-requests/{id}` | owner, their manager, admin | One request |
-| `POST /api/v1/leave-requests/{id}/approve` | approver | Approve (optional comment) |
-| `POST /api/v1/leave-requests/{id}/reject` | approver | Reject (comment required) |
+| `POST /api/v1/leave-requests/{id}/approve` | the employee's manager, or the admin | Approve (optional comment) |
+| `POST /api/v1/leave-requests/{id}/reject` | the employee's manager, or the admin | Reject (comment required) |
 | `POST /api/v1/leave-requests/{id}/cancel` | owner / admin | Cancel (see D3) |
-| `GET /api/v1/team/members`, `GET /api/v1/team/leave-requests?status=` | manager, admin | People and requests the caller approves |
+| `GET /api/v1/team/members` | manager, admin | People whose requests the caller can decide on |
+| `GET /api/v1/team/leave-requests?status=&leave_type_id=&employee_id=&role=&start_date=&end_date=` | manager, admin | Requests the caller can decide on (a manager's team; everyone for the admin), with filters |
 | `GET /api/v1/team/calendar?start_date=&end_date=` | manager, admin | Approved leave in a date range |
 | `GET/POST /api/v1/admin/users`, `GET/PATCH /api/v1/admin/users/{id}` | admin | Manage users and managers (only one admin account: 409 for a second) |
 | `GET/PUT /api/v1/admin/users/{id}/balances` | admin | Yearly allowances |
@@ -382,7 +383,8 @@ Where the brief left details open, these decisions were made:
   on approval (rule 5); pending requests just stop an employee from over-committing with several requests.
 - **D2 – Organisation model: one admin, one manager level.** Employees report to a manager; managers and the
   admin have no manager. Think of each **manager** as an office's HR lead, approving leave only for their own
-  office's staff, and the **admin** as the Director, who manages the setup and approves the managers' leave.
+  office's staff, and the **admin** as the Director, who manages the setup, approves the managers' leave and can
+  step in on any employee's request (rule 6 restricts managers to their own team; it does not restrict the admin).
   The brief lists "everything an employee can do" for managers but not for admins, so:
   - **the admin does not request leave**: `POST /leave-requests` is limited to employees and managers (admin → 403),
     and the admin has no leave menu, balances or allowances;

@@ -305,11 +305,18 @@ class TestRule6ApprovalRights:
     def test_employee_cannot_approve_own(self, client, employee, pending):
         assert approve(client, employee, pending["id"]).status_code == 403
 
-    def test_admin_cannot_approve_employee_requests(self, client, admin, pending):
-        """D2: employees' requests belong to their manager, not to admins."""
-        r = approve(client, admin, pending["id"])
-        assert r.status_code == 403
-        assert r.json()["code"] == "NOT_YOUR_TEAM"
+    def test_admin_can_approve_any_employee_request(self, client, admin, employee, pending):
+        """D2: the admin (Director) can step in on any request; rule 6 only restricts managers."""
+        r = approve(client, admin, pending["id"], comment="Approved while the manager is away")
+        assert r.status_code == 200
+        assert (r.json()["status"], r.json()["decided_by_id"]) == ("approved", admin.id)
+        assert balance(client, employee)["used_days"] == 3
+
+    def test_admin_can_reject_any_employee_request(self, client, admin, outsider, annual):
+        req = submit(client, outsider, annual, date(2026, 3, 9), date(2026, 3, 10)).json()
+        r = reject(client, admin, req["id"], comment="Company event")
+        assert r.status_code == 200
+        assert r.json()["status"] == "rejected"
 
     def test_managers_request_is_approved_by_admin(self, client, manager, admin, annual):
         req = submit(client, manager, annual, date(2026, 3, 9), date(2026, 3, 10)).json()
@@ -505,10 +512,11 @@ class TestVisibilityAndLists:
         rows = client.get("/api/v1/team/leave-requests", params={"status": "pending"}, headers=auth_headers(manager)).json()
         assert [r["id"] for r in rows] == [pending["id"]]
 
-    def test_admin_queue_contains_manager_requests_only(self, client, admin, manager, annual, pending):
+    def test_admin_queue_contains_everyone(self, client, admin, manager, outsider, annual, pending):
         mgr_req = submit(client, manager, annual, date(2026, 3, 16), date(2026, 3, 17)).json()
+        out_req = submit(client, outsider, annual, date(2026, 3, 23), date(2026, 3, 24)).json()
         rows = client.get("/api/v1/team/leave-requests", headers=auth_headers(admin)).json()
-        assert [r["id"] for r in rows] == [mgr_req["id"]]
+        assert {r["id"] for r in rows} == {pending["id"], mgr_req["id"], out_req["id"]}
 
     def test_team_members(self, client, manager, employee, employee2, outsider):
         names = [m["full_name"] for m in client.get("/api/v1/team/members", headers=auth_headers(manager)).json()]
@@ -577,3 +585,53 @@ class TestDatabaseBackstops:
                                     end_date=date(2026, 3, 9), working_days=1, status=LeaveStatus.APPROVED,
                                     decided_by_id=employee.id, decided_at=clock.now_utc()))
                 db.flush()
+
+
+class TestApprovalQueueFilters:
+    """GET /team/leave-requests filters (used by the dashboard widgets and the Approvals page)."""
+
+    QUEUE = "/api/v1/team/leave-requests"
+
+    @pytest.fixture
+    def mixed(self, client, admin, manager, employee, employee2, annual, sick):
+        a = submit(client, employee, annual, date(2026, 3, 9), date(2026, 3, 10)).json()     # pending, annual
+        b = submit(client, employee2, sick, date(2026, 4, 6), date(2026, 4, 6)).json()       # approved, sick
+        approve(client, manager, b["id"])
+        c = submit(client, manager, annual, date(2026, 5, 4), date(2026, 5, 5)).json()       # rejected, manager
+        reject(client, admin, c["id"], comment="Busy")
+        return {"a": a["id"], "b": b["id"], "c": c["id"]}
+
+    def ids(self, client, user, **params):
+        r = client.get(self.QUEUE, params=params, headers=auth_headers(user))
+        assert r.status_code == 200, r.text
+        return {row["id"] for row in r.json()}
+
+    def test_status(self, client, admin, mixed):
+        assert self.ids(client, admin, status="approved") == {mixed["b"]}
+        assert self.ids(client, admin, status="rejected") == {mixed["c"]}
+
+    def test_leave_type(self, client, admin, sick, mixed):
+        assert self.ids(client, admin, leave_type_id=sick.id) == {mixed["b"]}
+
+    def test_employee(self, client, admin, employee, mixed):
+        assert self.ids(client, admin, employee_id=employee.id) == {mixed["a"]}
+
+    def test_role(self, client, admin, mixed):
+        assert self.ids(client, admin, role="manager") == {mixed["c"]}
+        assert self.ids(client, admin, role="employee") == {mixed["a"], mixed["b"]}
+
+    def test_date_range_overlap(self, client, admin, mixed):
+        assert self.ids(client, admin, start_date="2026-03-10", end_date="2026-04-30") == {mixed["a"], mixed["b"]}
+        assert self.ids(client, admin, start_date="2026-05-05") == {mixed["c"]}
+
+    def test_combined_filters(self, client, admin, annual, mixed):
+        assert self.ids(client, admin, status="pending", leave_type_id=annual.id, role="employee") == {mixed["a"]}
+
+    def test_manager_filters_stay_within_own_team(self, client, manager, mixed):
+        # The manager's own (rejected) request and other teams never appear in their queue.
+        assert self.ids(client, manager) == {mixed["a"], mixed["b"]}
+        assert self.ids(client, manager, role="manager") == set()
+
+    def test_invalid_range_is_422(self, client, admin):
+        r = client.get(self.QUEUE, params={"start_date": "2026-05-01", "end_date": "2026-04-01"}, headers=auth_headers(admin))
+        assert r.status_code == 422

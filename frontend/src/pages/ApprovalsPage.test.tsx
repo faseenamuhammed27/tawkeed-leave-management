@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
@@ -13,13 +13,18 @@ const REQUEST: LeaveRequest = {
   cancelled_by_id: null, cancelled_by_name: null, cancellation_reason: null, cancelled_at: null, created_at: "2030-01-01T10:00:00Z",
 };
 
+const FILTER_DATA = {
+  [`GET ${API}/team/members`]: [{ id: 3, full_name: "Sara Ahmed", email: "employee1@tawkeed.example", role: "employee" }],
+  [`GET ${API}/leave-types`]: [{ id: 1, code: "ANNUAL", name: "Annual Leave", default_annual_days: 20, is_active: true }],
+};
+
 describe("ApprovalsPage", () => {
   it("lists pending team requests", async () => {
     signIn("manager");
     const { calls } = mockApi({ [`GET ${API}/team/leave-requests`]: [REQUEST] });
     renderPage(<ApprovalsPage />);
     expect(await screen.findByText("Sara Ahmed")).toBeInTheDocument();
-    expect(calls[0].query.get("status")).toBe("pending");
+    expect(calls.find((c) => c.path.endsWith("/team/leave-requests"))!.query.get("status")).toBe("pending");
   });
 
   it("shows an empty state when nothing is waiting", async () => {
@@ -32,6 +37,7 @@ describe("ApprovalsPage", () => {
   it("requires a comment to reject", async () => {
     signIn("manager");
     const { calls } = mockApi({
+      ...FILTER_DATA,
       [`GET ${API}/team/leave-requests`]: [REQUEST],
       [`POST ${API}/leave-requests/7/reject`]: { ...REQUEST, status: "rejected", decision_comment: "Busy week" },
     });
@@ -57,6 +63,7 @@ describe("ApprovalsPage", () => {
   it("approves with an optional comment", async () => {
     signIn("manager");
     const { calls } = mockApi({
+      ...FILTER_DATA,
       [`GET ${API}/team/leave-requests`]: [REQUEST],
       [`POST ${API}/leave-requests/7/approve`]: { ...REQUEST, status: "approved" },
     });
@@ -71,6 +78,7 @@ describe("ApprovalsPage", () => {
   it("shows the API's refusal (e.g. not your team) inside the dialog", async () => {
     signIn("manager");
     mockApi({
+      ...FILTER_DATA,
       [`GET ${API}/team/leave-requests`]: [REQUEST],
       [`POST ${API}/leave-requests/7/approve`]: () => ({
         status: 400,
@@ -82,5 +90,40 @@ describe("ApprovalsPage", () => {
     const dialog = screen.getByRole("dialog");
     await userEvent.click(within(dialog).getByRole("button", { name: "Approve" }));
     expect(await within(dialog).findByText(/Insufficient balance to approve/)).toBeInTheDocument();
+  });
+
+  it("applies filters from the URL (e.g. a dashboard widget link) and sends them to the API", async () => {
+    signIn("admin");
+    const { calls } = mockApi({ ...FILTER_DATA, [`GET ${API}/team/leave-requests`]: [] });
+    renderPage(<ApprovalsPage />, {
+      route: "/approvals?status=approved&leave_type_id=1&role=manager&start_date=2026-01-01&end_date=2026-12-31",
+      path: "/approvals",
+    });
+    expect(await screen.findByText("No requests match these filters")).toBeInTheDocument();
+    const q = calls.find((c) => c.path.endsWith("/team/leave-requests"))!.query;
+    expect(Object.fromEntries(q)).toEqual({
+      status: "approved", leave_type_id: "1", role: "manager", start_date: "2026-01-01", end_date: "2026-12-31",
+    });
+    expect(screen.getByRole("button", { name: "Approved" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("changing a filter refetches with it", async () => {
+    signIn("admin");
+    const { calls } = mockApi({ ...FILTER_DATA, [`GET ${API}/team/leave-requests`]: [REQUEST] });
+    renderPage(<ApprovalsPage />, { route: "/approvals", path: "/approvals" });
+    await screen.findByText("Sara Ahmed", { selector: "td" });
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Person" }), "3");
+    await waitFor(() =>
+      expect(calls.some((c) => c.path.endsWith("/team/leave-requests") && c.query.get("employee_id") === "3")).toBe(true),
+    );
+    expect(screen.getByRole("button", { name: "Clear filters" })).toBeInTheDocument();
+  });
+
+  it("does not offer the role filter to managers", async () => {
+    signIn("manager");
+    mockApi({ ...FILTER_DATA, [`GET ${API}/team/leave-requests`]: [] });
+    renderPage(<ApprovalsPage />);
+    await screen.findByText("Nothing waiting for approval");
+    expect(screen.queryByRole("combobox", { name: "Role" })).not.toBeInTheDocument();
   });
 });

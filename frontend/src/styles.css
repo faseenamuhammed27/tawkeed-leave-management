@@ -255,3 +255,9 @@ input[aria-invalid="true"] { border-color: var(--danger); }
 /* ---------- admin overview ---------- */
 .stat-card { display: flex; flex-direction: column; gap: 6px; text-decoration: none; color: inherit; }
 .stat-card:hover { border-color: #93c5fd; }
+.stat-pending .big-number { color: var(--warning); }
+.stat-approved .big-number { color: var(--success); }
+.stat-rejected .big-number { color: var(--danger); }
+.type-breakdown { list-style: none; margin: 6px 0 0; padding: 6px 0 0; border-top: 1px solid var(--border); font-size: 0.82rem; }
+.type-breakdown li { display: flex; justify-content: space-between; padding: 2px 0; }
+.toolbar input[type="date"] { min-width: 150px; }

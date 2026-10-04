@@ -93,25 +93,28 @@ def approver_scope(actor: User) -> ColumnElement[bool]:
     """SQL condition on User selecting whose requests `actor` may approve or reject (D2).
 
     - A manager handles their own team (employees whose manager_id is the manager).
-    - An admin handles managers and other admins (one manager level; admins have no manager).
+    - The admin (Director) can act on anyone's request: managers' requests come to them, and they
+      can step in on any employee's request (e.g. when the office manager is away).
     - Nobody handles their own requests.
     """
     if actor.role == UserRole.MANAGER:
         return and_(User.manager_id == actor.id, User.id != actor.id)
     if actor.role == UserRole.ADMIN:
-        return and_(User.role.in_([UserRole.MANAGER, UserRole.ADMIN]), User.id != actor.id)
+        return User.id != actor.id
     return false()
 
 
 def _ensure_can_decide(actor: User, employee: User) -> None:
     if actor.id == employee.id:
         raise PermissionDeniedError("You cannot approve or reject your own leave", "SELF_APPROVAL_FORBIDDEN")
+    if actor.role == UserRole.ADMIN:
+        return  # the admin can decide on any request except their own
     if employee.role == UserRole.EMPLOYEE:
         allowed = actor.role == UserRole.MANAGER and employee.manager_id == actor.id
         message = "Only the employee's own manager can decide on this request"
     else:
-        allowed = actor.role == UserRole.ADMIN
-        message = "Requests from managers and admins are decided by an admin"
+        allowed = False
+        message = "Requests from managers are decided by the admin"
     if not allowed:
         raise PermissionDeniedError(message, "NOT_YOUR_TEAM")
 
@@ -146,7 +149,21 @@ def list_for_employee(db: Session, user_id: int, status: LeaveStatus | None = No
     return db.scalars(stmt.order_by(LeaveRequest.start_date.desc(), LeaveRequest.id.desc())).all()
 
 
-def list_for_approver(db: Session, actor: User, status: LeaveStatus | None = None) -> Sequence[LeaveRequest]:
+def list_for_approver(
+    db: Session,
+    actor: User,
+    status: LeaveStatus | None = None,
+    *,
+    leave_type_id: int | None = None,
+    employee_id: int | None = None,
+    role: UserRole | None = None,
+    start: date | None = None,
+    end: date | None = None,
+) -> Sequence[LeaveRequest]:
+    """Requests the actor may decide on, with optional filters.
+
+    start/end select requests whose dates overlap the range.
+    """
     stmt = (
         select(LeaveRequest)
         .join(User, LeaveRequest.employee_id == User.id)
@@ -155,6 +172,16 @@ def list_for_approver(db: Session, actor: User, status: LeaveStatus | None = Non
     )
     if status is not None:
         stmt = stmt.where(LeaveRequest.status == status)
+    if leave_type_id is not None:
+        stmt = stmt.where(LeaveRequest.leave_type_id == leave_type_id)
+    if employee_id is not None:
+        stmt = stmt.where(LeaveRequest.employee_id == employee_id)
+    if role is not None:
+        stmt = stmt.where(User.role == role)
+    if start is not None:
+        stmt = stmt.where(LeaveRequest.end_date >= start)
+    if end is not None:
+        stmt = stmt.where(LeaveRequest.start_date <= end)
     return db.scalars(stmt.order_by(LeaveRequest.start_date, LeaveRequest.id)).all()
 
 

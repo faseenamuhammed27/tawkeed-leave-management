@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { errorMessage } from "../../api/client";
@@ -24,7 +25,9 @@ export function UsersPage() {
   const { user: me } = useAuth();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
-  const [roleFilter, setRoleFilter] = useState<Role | "">("");
+  const [params] = useSearchParams();
+  const initialRole = params.get("role") as Role | null;
+  const [roleFilter, setRoleFilter] = useState<Role | "">(initialRole && ROLES.includes(initialRole) ? initialRole : "");
   const [editing, setEditing] = useState<User | "new" | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY);
   const [flash, setFlash] = useState<string | null>(null);

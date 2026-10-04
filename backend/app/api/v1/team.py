@@ -5,7 +5,7 @@ from fastapi import APIRouter, Query
 
 from app.api.deps import DbSession, ManagerOrAdmin
 from app.core.errors import InvalidInputError
-from app.models import LeaveStatus
+from app.models import LeaveStatus, UserRole
 from app.schemas.leave import CalendarEntry, LeaveRequestOut
 from app.schemas.user import UserBrief
 from app.services import leave_service
@@ -17,14 +17,29 @@ MAX_CALENDAR_DAYS = 366
 
 @router.get("/members", response_model=list[UserBrief])
 def members(user: ManagerOrAdmin, db: DbSession):
-    """People whose leave the caller approves (a manager's team; for admins, managers and other admins)."""
+    """People whose leave the caller approves (a manager's team; for the admin, everyone else)."""
     return leave_service.team_members(db, user)
 
 
 @router.get("/leave-requests", response_model=list[LeaveRequestOut])
-def team_requests(user: ManagerOrAdmin, db: DbSession,
-                  status_filter: Annotated[LeaveStatus | None, Query(alias="status")] = None):
-    return [LeaveRequestOut.from_model(r) for r in leave_service.list_for_approver(db, user, status_filter)]
+def team_requests(
+    user: ManagerOrAdmin,
+    db: DbSession,
+    status_filter: Annotated[LeaveStatus | None, Query(alias="status")] = None,
+    leave_type_id: int | None = None,
+    employee_id: int | None = None,
+    role: Annotated[UserRole | None, Query(description="Requester's role (employee or manager)")] = None,
+    start_date: Annotated[date | None, Query(description="Requests overlapping this date or later")] = None,
+    end_date: Annotated[date | None, Query(description="Requests overlapping this date or earlier")] = None,
+):
+    """Requests the caller can decide on: a manager's team, or everyone (except themselves) for the admin."""
+    if start_date and end_date and end_date < start_date:
+        raise InvalidInputError("end_date cannot be before start_date")
+    rows = leave_service.list_for_approver(
+        db, user, status_filter, leave_type_id=leave_type_id, employee_id=employee_id,
+        role=role, start=start_date, end=end_date,
+    )
+    return [LeaveRequestOut.from_model(r) for r in rows]
 
 
 @router.get("/calendar", response_model=list[CalendarEntry])

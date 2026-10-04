@@ -42,9 +42,18 @@ export const leaveApi = {
     api.post<LeaveRequest>(`${V1}/leave-requests/${id}/cancel`, reason ? { reason } : undefined),
 };
 
+export type QueueFilters = {
+  status?: LeaveStatus;
+  leave_type_id?: number;
+  employee_id?: number;
+  role?: Role;
+  start_date?: string;
+  end_date?: string;
+};
+
 export const teamApi = {
   members: () => api.get<UserBrief[]>(`${V1}/team/members`),
-  requests: (status?: LeaveStatus) => api.get<LeaveRequest[]>(`${V1}/team/leave-requests`, { status }),
+  requests: (filters: QueueFilters = {}) => api.get<LeaveRequest[]>(`${V1}/team/leave-requests`, filters),
   calendar: (start_date: string, end_date: string) =>
     api.get<CalendarEntry[]>(`${V1}/team/calendar`, { start_date, end_date }),
 };

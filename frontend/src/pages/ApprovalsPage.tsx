@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
 
 import { errorMessage } from "../api/client";
-import { leaveApi, teamApi } from "../api/endpoints";
-import type { LeaveRequest, LeaveStatus } from "../api/types";
+import { leaveApi, referenceApi, teamApi, type QueueFilters } from "../api/endpoints";
+import type { LeaveRequest, LeaveStatus, Role } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
 import { RequestTable } from "../components/RequestTable";
 import { Alert, EmptyState, ErrorAlert, Field, Modal, PageHeader, Spinner } from "../components/ui";
@@ -14,12 +15,40 @@ type Decision = { request: LeaveRequest; action: "approve" | "reject" };
 export function ApprovalsPage() {
   const { hasRole } = useAuth();
   const queryClient = useQueryClient();
-  const [tab, setTab] = useState<LeaveStatus | "">("pending");
+  const isAdmin = hasRole("admin");
+  // Filters live in the URL so dashboard widgets can link to a filtered list.
+  const [params, setParams] = useSearchParams();
+  const statusParam = params.get("status");
+  const tab: LeaveStatus | "" = statusParam === "all" ? "" : ((statusParam as LeaveStatus | null) ?? "pending");
+  const num = (key: string) => (params.get(key) ? Number(params.get(key)) : undefined);
+  const filters: QueueFilters = {
+    status: tab || undefined,
+    leave_type_id: num("leave_type_id"),
+    employee_id: num("employee_id"),
+    role: isAdmin ? ((params.get("role") as Role | null) ?? undefined) : undefined,
+    start_date: params.get("start_date") ?? undefined,
+    end_date: params.get("end_date") ?? undefined,
+  };
+  const extraFilters = ["leave_type_id", "employee_id", "role", "start_date", "end_date"].some((k) => params.get(k));
+
+  function setFilter(key: string, value: string) {
+    const next = new URLSearchParams(params);
+    if (value) next.set(key, value);
+    else next.delete(key);
+    setParams(next, { replace: true });
+  }
+
+  function clearFilters() {
+    setParams(statusParam ? { status: statusParam } : {}, { replace: true });
+  }
+
   const [decision, setDecision] = useState<Decision | null>(null);
   const [comment, setComment] = useState("");
   const [flash, setFlash] = useState<string | null>(null);
 
-  const requests = useQuery({ queryKey: ["team-requests", tab], queryFn: () => teamApi.requests(tab || undefined) });
+  const requests = useQuery({ queryKey: ["team-requests", filters], queryFn: () => teamApi.requests(filters) });
+  const leaveTypes = useQuery({ queryKey: ["leave-types"], queryFn: referenceApi.leaveTypes });
+  const members = useQuery({ queryKey: ["team-members"], queryFn: teamApi.members });
 
   const decide = useMutation({
     mutationFn: ({ request, action }: Decision) =>
@@ -45,11 +74,7 @@ export function ApprovalsPage() {
     <>
       <PageHeader
         title="Approvals"
-        subtitle={
-          hasRole("admin")
-            ? "Leave requests from managers and other admins."
-            : "Leave requests from your team."
-        }
+        subtitle={isAdmin ? "Leave requests from everyone in the company." : "Leave requests from your team."}
       />
       {flash && <Alert kind="success">{flash}</Alert>}
 
@@ -60,11 +85,45 @@ export function ApprovalsPage() {
             type="button"
             className={`chip${tab === s ? " chip-active" : ""}`}
             aria-pressed={tab === s}
-            onClick={() => setTab(s)}
+            onClick={() => setFilter("status", s || "all")}
           >
             {s ? s[0].toUpperCase() + s.slice(1) : "All"}
           </button>
         ))}
+      </div>
+
+      <div className="toolbar" role="group" aria-label="Filters">
+        <select aria-label="Leave type" value={params.get("leave_type_id") ?? ""} onChange={(e) => setFilter("leave_type_id", e.target.value)}>
+          <option value="">All leave types</option>
+          {(leaveTypes.data ?? []).map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.name}
+            </option>
+          ))}
+        </select>
+        {isAdmin && (
+          <select aria-label="Role" value={params.get("role") ?? ""} onChange={(e) => setFilter("role", e.target.value)}>
+            <option value="">All roles</option>
+            <option value="employee">Employees</option>
+            <option value="manager">Managers</option>
+          </select>
+        )}
+        <select aria-label="Person" value={params.get("employee_id") ?? ""} onChange={(e) => setFilter("employee_id", e.target.value)}>
+          <option value="">Everyone</option>
+          {(members.data ?? []).map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.full_name}
+            </option>
+          ))}
+        </select>
+        <input type="date" aria-label="From date" value={params.get("start_date") ?? ""} onChange={(e) => setFilter("start_date", e.target.value)} />
+        <input type="date" aria-label="To date" value={params.get("end_date") ?? ""} onChange={(e) => setFilter("end_date", e.target.value)} />
+        {extraFilters && (
+          <button type="button" className="btn btn-small btn-ghost" onClick={clearFilters}>
+            Clear filters
+          </button>
+        )}
+        {requests.data && <span className="muted small">{requests.data.length} request{requests.data.length === 1 ? "" : "s"}</span>}
       </div>
 
       {requests.isPending && <Spinner />}
@@ -89,8 +148,8 @@ export function ApprovalsPage() {
             }
           />
         ) : (
-          <EmptyState title={tab === "pending" ? "Nothing waiting for approval" : "No requests to show"}>
-            {tab === "pending" && "New requests from your team will appear here."}
+          <EmptyState title={tab === "pending" && !extraFilters ? "Nothing waiting for approval" : "No requests match these filters"}>
+            {tab === "pending" && !extraFilters && "New requests will appear here."}
           </EmptyState>
         ))}
 
