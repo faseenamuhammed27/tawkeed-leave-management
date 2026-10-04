@@ -380,8 +380,13 @@ Where the brief left details open, these decisions were made:
 
 - **D1 – Pending requests reserve balance.** Available = allocated − used − pending. Balance is only *deducted*
   on approval (rule 5); pending requests just stop an employee from over-committing with several requests.
-- **D2 – One manager level.** Employees must have a manager; managers and admins have none.
-  A manager's leave is approved by an admin, an admin's leave by another admin.
+- **D2 – Organisation model: one admin, one manager level.** Employees report to a manager; managers and the
+  admin have no manager. Think of each **manager** as an office's HR lead, approving leave only for their own
+  office's staff, and the single **admin** as the Director, who manages the setup and approves the managers' leave.
+  The brief lists "everything an employee can do" for managers but not for admins, so the admin is treated as a
+  setup and oversight role and is not expected to request leave through the portal. The system still supports
+  more than one admin; an admin's own request would then need a different admin, because nobody can approve
+  their own leave.
 - **D3 – Cancellation.** Employees can cancel their own pending leave, or approved leave before it starts.
   Admins can cancel approved leave as an administrative correction (reason required). Managers cannot cancel.
   Nothing can be cancelled once it has started. Every cancellation is audited and restores used days if it was approved.
@@ -399,7 +404,8 @@ Where the brief left details open, these decisions were made:
 
 Known limitations:
 
-- With a single seeded admin, an admin's own leave cannot be approved (a second admin is needed).
+- With the single seeded admin, an admin's own leave request would stay pending (a second admin is needed);
+  by design the admin is not expected to request leave (see D2).
 - The lockout is per account, so someone could deliberately lock another user out for 15 minutes
   (use the `lockout-test` account to try it). Per-IP rate limiting would be the next step.
 - No refresh tokens: users sign in again after 30 minutes.
