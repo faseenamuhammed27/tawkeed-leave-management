@@ -20,13 +20,22 @@ Backend: **FastAPI · PostgreSQL 17 · SQLAlchemy 2 · Alembic · JWT**. Fronten
 All demo accounts share one password, provided with the submission email (it is set through the
 `SEED_DEMO_PASSWORD` environment variable and is not stored in this repository).
 
-| Role | Email | Notes |
+| Role | Email | Name and what to look at |
 |---|---|---|
-| Admin | `admin@tawkeed.example` | The Director: manages users, leave types, allowances, holidays; views the audit log; can approve or reject any request (managers' requests come to them). Does not request leave |
-| Manager | `manager@tawkeed.example` | Manages Sara and Omar |
-| Employee | `employee1@tawkeed.example` | Sara Ahmed – has a pending request (2–3 Nov) for the manager to act on |
-| Employee | `employee2@tawkeed.example` | Omar Farooq – has an approved request (9–11 Nov) on the team calendar |
+| Admin (Director) | `admin@tawkeed.example` | Aisha Al Mansouri – company setup, all approvals, team overview, audit log. Does not request leave |
+| Manager | `manager@tawkeed.example` | Khalid Rahman – team: Sara, Omar (and the lockout-test account). His own leave (7–8 Dec) was approved by the admin |
+| Manager | `manager2@tawkeed.example` | Fatima Hassan – team: Yusuf, Layla, Rahul, Noor. Has Rahul's and Noor's pending requests to review |
+| Employee | `employee1@tawkeed.example` | Sara Ahmed – pending request (2–3 Nov) for Khalid to act on |
+| Employee | `employee2@tawkeed.example` | Omar Farooq – approved leave (9–11 Nov) on the team calendar; a rejected request (21–22 Dec) |
+| Employee | `employee3@tawkeed.example` | Yusuf Khan – approved leave (19–21 Oct); a request cancelled by the admin as a correction |
+| Employee | `employee4@tawkeed.example` | Layla Nasser – a rejected request (26–27 Oct) and one she cancelled after approval |
+| Employee | `employee5@tawkeed.example` | Rahul Menon – pending request (16–20 Nov) for Fatima |
+| Employee | `employee6@tawkeed.example` | Noor Saleh – **deactivated** (cannot sign in); her pending request shows the Deactivated badge |
 | Employee | `lockout-test@tawkeed.example` | **For trying the failed-login lockout** – see below |
+
+The production demo covers every request status: pending, approved, rejected, cancelled by the employee and
+cancelled by the admin. The extra people and requests were added through the live app (so they follow the same
+rules and appear in the audit log); the seed script creates the core accounts and two sample requests.
 
 **Testing the login lockout:** please use `lockout-test@tawkeed.example` rather than the shared accounts.
 After 5 wrong passwords that account is locked for 15 minutes (HTTP 429, even with the correct password),
@@ -377,6 +386,7 @@ deliberately to keep the scope focused; each would be a natural next step.
 | Self-service password reset and email changes | Needs an email service; admins can reset passwords |
 | Frontend container in Docker Compose | The frontend is a static build served by Render's CDN; Compose covers the API and database, which is where the runtime dependencies are |
 | File attachments (e.g. medical certificates) | Not in the brief; would need file storage and retention rules |
+| Pagination beyond the audit log | The audit log grows without limit and is paginated server-side (25 per page, max 100). Other lists are bounded (one company's staff, a team's requests) and filterable; at larger scale Approvals, My requests, Team members and Users would use the same `page`/`page_size` pattern, with dashboard counts computed on the server |
 
 ## Assumptions, decisions and known limitations
 
