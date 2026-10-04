@@ -3,7 +3,7 @@ from typing import Annotated, Any
 
 from pydantic import BaseModel, Field, StringConstraints, model_validator
 
-from app.models import LeaveRequest, LeaveStatus
+from app.models import LeaveRequest, LeaveStatus, UserRole
 from app.schemas.common import APIModel, NonEmptyStr100, OptionalComment, ORMModel, RequiredComment
 from app.services.balance_service import BalanceSummary
 
@@ -134,6 +134,7 @@ class LeaveRequestOut(BaseModel):
     id: int
     employee_id: int
     employee_name: str
+    employee_role: UserRole
     leave_type_id: int
     leave_type_code: str
     leave_type_name: str
@@ -156,6 +157,7 @@ class LeaveRequestOut(BaseModel):
     def from_model(cls, r: LeaveRequest) -> "LeaveRequestOut":
         return cls(
             id=r.id, employee_id=r.employee_id, employee_name=r.employee.full_name,
+            employee_role=r.employee.role,
             leave_type_id=r.leave_type_id, leave_type_code=r.leave_type.code, leave_type_name=r.leave_type.name,
             start_date=r.start_date, end_date=r.end_date, working_days=r.working_days, reason=r.reason,
             status=r.status,

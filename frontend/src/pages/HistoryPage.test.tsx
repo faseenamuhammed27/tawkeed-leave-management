@@ -7,7 +7,7 @@ import { API, mockApi, renderPage, signIn } from "../test/utils";
 import { HistoryPage, canCancelOwn } from "./HistoryPage";
 
 const base: LeaveRequest = {
-  id: 1, employee_id: 3, employee_name: "Sara Ahmed", leave_type_id: 1, leave_type_code: "ANNUAL",
+  id: 1, employee_id: 3, employee_name: "Sara Ahmed", employee_role: "employee", leave_type_id: 1, leave_type_code: "ANNUAL",
   leave_type_name: "Annual Leave", start_date: "2030-03-04", end_date: "2030-03-05", working_days: 2, reason: null,
   status: "pending", decided_by_id: null, decided_by_name: null, decision_comment: null, decided_at: null,
   cancelled_by_id: null, cancelled_by_name: null, cancellation_reason: null, cancelled_at: null, created_at: "2030-01-01T10:00:00Z",

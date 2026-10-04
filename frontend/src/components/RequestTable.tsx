@@ -7,11 +7,13 @@ import { StatusBadge } from "./ui";
 export function RequestTable({
   requests,
   showEmployee = false,
+  showRole = false,
   actions,
   caption,
 }: {
   requests: LeaveRequest[];
   showEmployee?: boolean;
+  showRole?: boolean;
   actions?: (r: LeaveRequest) => ReactNode;
   caption?: string;
 }) {
@@ -22,6 +24,7 @@ export function RequestTable({
         <thead>
           <tr>
             {showEmployee && <th>Employee</th>}
+            {showRole && <th>Role</th>}
             <th>Type</th>
             <th>Dates</th>
             <th className="num">Days</th>
@@ -34,6 +37,11 @@ export function RequestTable({
           {requests.map((r) => (
             <tr key={r.id}>
               {showEmployee && <td data-label="Employee">{r.employee_name}</td>}
+              {showRole && (
+                <td data-label="Role">
+                  <span className={`role-chip role-${r.employee_role}`}>{r.employee_role}</span>
+                </td>
+              )}
               <td data-label="Type">{r.leave_type_name}</td>
               <td data-label="Dates">{formatRange(r.start_date, r.end_date)}</td>
               <td data-label="Days" className="num">{r.working_days}</td>

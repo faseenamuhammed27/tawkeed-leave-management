@@ -133,6 +133,7 @@ export function ApprovalsPage() {
           <RequestTable
             requests={requests.data}
             showEmployee
+            showRole={isAdmin}
             caption="Team leave requests"
             actions={(r) =>
               r.status === "pending" ? (

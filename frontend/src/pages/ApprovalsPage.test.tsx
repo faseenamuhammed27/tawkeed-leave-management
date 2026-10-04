@@ -7,7 +7,7 @@ import { API, mockApi, renderPage, signIn } from "../test/utils";
 import { ApprovalsPage } from "./ApprovalsPage";
 
 const REQUEST: LeaveRequest = {
-  id: 7, employee_id: 3, employee_name: "Sara Ahmed", leave_type_id: 1, leave_type_code: "ANNUAL",
+  id: 7, employee_id: 3, employee_name: "Sara Ahmed", employee_role: "employee", leave_type_id: 1, leave_type_code: "ANNUAL",
   leave_type_name: "Annual Leave", start_date: "2030-03-04", end_date: "2030-03-05", working_days: 2, reason: "Family visit",
   status: "pending", decided_by_id: null, decided_by_name: null, decision_comment: null, decided_at: null,
   cancelled_by_id: null, cancelled_by_name: null, cancellation_reason: null, cancelled_at: null, created_at: "2030-01-01T10:00:00Z",
@@ -125,5 +125,26 @@ describe("ApprovalsPage", () => {
     renderPage(<ApprovalsPage />);
     await screen.findByText("Nothing waiting for approval");
     expect(screen.queryByRole("combobox", { name: "Role" })).not.toBeInTheDocument();
+  });
+
+  it("shows the requester's role to the admin, on every tab", async () => {
+    signIn("admin");
+    mockApi({
+      ...FILTER_DATA,
+      [`GET ${API}/team/leave-requests`]: [REQUEST, { ...REQUEST, id: 8, employee_name: "Khalid Rahman", employee_role: "manager" }],
+    });
+    renderPage(<ApprovalsPage />, { route: "/approvals?status=all", path: "/approvals" });
+    const table = await screen.findByRole("table");
+    expect(within(table).getByRole("columnheader", { name: "Role" })).toBeInTheDocument();
+    expect(within(table).getByText("employee")).toBeInTheDocument();
+    expect(within(table).getByText("manager")).toBeInTheDocument();
+  });
+
+  it("does not show a role column to managers", async () => {
+    signIn("manager");
+    mockApi({ ...FILTER_DATA, [`GET ${API}/team/leave-requests`]: [REQUEST] });
+    renderPage(<ApprovalsPage />);
+    const table = await screen.findByRole("table");
+    expect(within(table).queryByRole("columnheader", { name: "Role" })).not.toBeInTheDocument();
   });
 });

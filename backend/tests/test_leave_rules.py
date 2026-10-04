@@ -517,6 +517,9 @@ class TestVisibilityAndLists:
         out_req = submit(client, outsider, annual, date(2026, 3, 23), date(2026, 3, 24)).json()
         rows = client.get("/api/v1/team/leave-requests", headers=auth_headers(admin)).json()
         assert {r["id"] for r in rows} == {pending["id"], mgr_req["id"], out_req["id"]}
+        roles = {r["id"]: r["employee_role"] for r in rows}
+        assert roles[mgr_req["id"]] == "manager"
+        assert roles[pending["id"]] == roles[out_req["id"]] == "employee"
 
     def test_team_members(self, client, manager, employee, employee2, outsider):
         names = [m["full_name"] for m in client.get("/api/v1/team/members", headers=auth_headers(manager)).json()]

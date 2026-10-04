@@ -173,7 +173,7 @@ The API's `CORS_ORIGINS` must include the frontend's address (`http://localhost:
 | Dashboard | everyone | Employees and managers: balance cards (allocated, used, pending, available), recent requests, holidays, pending approvals. Admin: manager and employee counts, and Pending / Approved / Rejected widgets broken down by leave type for **this month or this year**; each widget opens the filtered list |
 | Apply for leave | employee, manager | Date pickers with a **live working-day count** from the API (`/leave-requests/preview`), holidays in range, balance warning; API errors shown in the form |
 | My requests | employee, manager | History with status filters; cancel own pending leave, or approved leave before it starts |
-| Approvals | manager, admin | Queue with filters for status, leave type, person, date range (and role, for the admin), kept in the URL; approve (optional comment) or reject (**comment required**) |
+| Approvals | manager, admin | Queue with filters for status, leave type, person, date range (and role, for the admin), kept in the URL; the admin also sees each requester's role; approve (optional comment) or reject (**comment required**) |
 | Team calendar | manager, admin | Month view of approved leave with weekends and holidays marked; admins can cancel approved leave as a correction (reason required) |
 | Users & managers, Allowances, Leave types, Public holidays, Audit log | admin | Everything the admin API offers |
 
@@ -225,7 +225,7 @@ still in the future while the demo is reviewed. In the Docker image, `docker-ent
 | Suite | Tool | Tests | Result |
 |---|---|---|---|
 | Backend: business rules, permissions, auth/security, admin, seed | pytest + coverage | 326 | all passing, **97.6% line coverage** (CI gate: 70%) |
-| Frontend: components, API client, role-based UI | Vitest + Testing Library | 48 | all passing |
+| Frontend: components, API client, role-based UI | Vitest + Testing Library | 50 | all passing |
 | End-to-end: full employee → manager → admin workflow in a real browser | Playwright | 3 | all passing (CI, local, and once against the live site) |
 | Deployment smoke test against a running API | `scripts/smoke_test.py` | 37 checks | all passing |
 
@@ -256,7 +256,7 @@ pytest --cov=app --cov-report=term-missing
 
 ```bash
 cd frontend
-npm test                      # Vitest + Testing Library (48 tests)
+npm test                      # Vitest + Testing Library (50 tests)
 npm run typecheck
 E2E_PASSWORD=<demo password> npm run e2e   # Playwright; needs the API and `npm run preview -- --port 5173` running
 ```
