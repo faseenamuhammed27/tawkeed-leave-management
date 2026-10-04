@@ -1,10 +1,11 @@
+from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Body, Query, status
 
 from app.api.deps import CurrentUser, DbSession, LeaveRequester, ManagerOrAdmin
 from app.core import clock
-from app.core.errors import NotFoundError
+from app.core.errors import InvalidInputError, NotFoundError
 from app.models import LeaveStatus, LeaveType
 from app.schemas.common import ErrorResponse
 from app.schemas.leave import (
@@ -53,10 +54,22 @@ def preview(user: CurrentUser, db: DbSession, q: Annotated[LeavePreviewQuery, Qu
     return result
 
 
-@router.get("/mine", response_model=list[LeaveRequestOut])
-def my_requests(user: CurrentUser, db: DbSession, status_filter: Annotated[LeaveStatus | None, Query(alias="status")] = None):
-    """The caller's leave history, newest first."""
-    return [LeaveRequestOut.from_model(r) for r in leave_service.list_for_employee(db, user.id, status_filter)]
+@router.get("/mine", response_model=list[LeaveRequestOut], responses={422: {"model": ErrorResponse}})
+def my_requests(
+    user: CurrentUser,
+    db: DbSession,
+    status_filter: Annotated[LeaveStatus | None, Query(alias="status")] = None,
+    leave_type_id: int | None = None,
+    start_date: Annotated[date | None, Query(description="Requests overlapping this date or later")] = None,
+    end_date: Annotated[date | None, Query(description="Requests overlapping this date or earlier")] = None,
+):
+    """The caller's leave history, newest first, optionally filtered by status, leave type and dates."""
+    if start_date and end_date and end_date < start_date:
+        raise InvalidInputError("end_date cannot be before start_date")
+    rows = leave_service.list_for_employee(
+        db, user.id, status_filter, leave_type_id=leave_type_id, start=start_date, end=end_date,
+    )
+    return [LeaveRequestOut.from_model(r) for r in rows]
 
 
 @router.post("", response_model=LeaveRequestOut, status_code=status.HTTP_201_CREATED, responses=_E)

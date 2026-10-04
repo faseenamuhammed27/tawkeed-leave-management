@@ -33,7 +33,8 @@ export const referenceApi = {
 export const leaveApi = {
   preview: (params: { start_date: string; end_date: string; leave_type_id?: number }, signal?: AbortSignal) =>
     api.get<LeavePreview>(`${V1}/leave-requests/preview`, params, signal),
-  mine: (status?: LeaveStatus) => api.get<LeaveRequest[]>(`${V1}/leave-requests/mine`, { status }),
+  mine: (query: { status?: LeaveStatus; leave_type_id?: number; start_date?: string; end_date?: string } = {}) =>
+    api.get<LeaveRequest[]>(`${V1}/leave-requests/mine`, query),
   create: (body: { leave_type_id: number; start_date: string; end_date: string; reason?: string }) =>
     api.post<LeaveRequest>(`${V1}/leave-requests`, body),
   approve: (id: number, comment?: string) =>

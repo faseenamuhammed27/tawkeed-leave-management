@@ -142,10 +142,25 @@ def get_visible(db: Session, actor: User, request_id: int) -> LeaveRequest:
     return req
 
 
-def list_for_employee(db: Session, user_id: int, status: LeaveStatus | None = None) -> Sequence[LeaveRequest]:
+def list_for_employee(
+    db: Session,
+    user_id: int,
+    status: LeaveStatus | None = None,
+    *,
+    leave_type_id: int | None = None,
+    start: date | None = None,
+    end: date | None = None,
+) -> Sequence[LeaveRequest]:
+    """The user's own requests, newest first. start/end select requests overlapping the range."""
     stmt = select(LeaveRequest).where(LeaveRequest.employee_id == user_id).options(*_RELATIONS)
     if status is not None:
         stmt = stmt.where(LeaveRequest.status == status)
+    if leave_type_id is not None:
+        stmt = stmt.where(LeaveRequest.leave_type_id == leave_type_id)
+    if start is not None:
+        stmt = stmt.where(LeaveRequest.end_date >= start)
+    if end is not None:
+        stmt = stmt.where(LeaveRequest.start_date <= end)
     return db.scalars(stmt.order_by(LeaveRequest.start_date.desc(), LeaveRequest.id.desc())).all()
 
 

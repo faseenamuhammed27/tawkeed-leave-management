@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
@@ -25,10 +25,16 @@ describe("canCancelOwn (UI hint mirroring D3; the API decides)", () => {
   });
 });
 
+const TYPES = [
+  { id: 1, code: "ANNUAL", name: "Annual Leave", default_annual_days: 20, is_active: true },
+  { id: 2, code: "SICK", name: "Sick Leave", default_annual_days: 10, is_active: true },
+];
+
 describe("HistoryPage", () => {
   it("shows history with status and offers cancel only where allowed", async () => {
     signIn("employee");
     mockApi({
+      [`GET ${API}/leave-types`]: TYPES,
       [`GET ${API}/leave-requests/mine`]: [
         { ...base, id: 1 },
         { ...base, id: 2, status: "rejected", decided_by_name: "Khalid Rahman", decision_comment: "Busy week", start_date: "2030-04-01", end_date: "2030-04-01" },
@@ -45,6 +51,7 @@ describe("HistoryPage", () => {
   it("cancels a request after confirmation", async () => {
     signIn("employee");
     const { calls } = mockApi({
+      [`GET ${API}/leave-types`]: TYPES,
       [`GET ${API}/leave-requests/mine`]: [{ ...base, status: "approved", decided_by_id: 2 }],
       [`POST ${API}/leave-requests/1/cancel`]: { ...base, status: "cancelled", decided_by_id: 2 },
     });
@@ -62,6 +69,7 @@ describe("HistoryPage", () => {
   it("shows the API error if cancellation is refused", async () => {
     signIn("employee");
     mockApi({
+      [`GET ${API}/leave-types`]: TYPES,
       [`GET ${API}/leave-requests/mine`]: [base],
       [`POST ${API}/leave-requests/1/cancel`]: () => ({
         status: 409, body: { detail: "Leave cannot be cancelled once it has started", code: "LEAVE_ALREADY_STARTED" },
@@ -76,16 +84,35 @@ describe("HistoryPage", () => {
 
   it("shows an empty state and a load error with retry", async () => {
     signIn("employee");
-    mockApi({ [`GET ${API}/leave-requests/mine`]: [] });
+    mockApi({ [`GET ${API}/leave-types`]: TYPES, [`GET ${API}/leave-requests/mine`]: [] });
     renderPage(<HistoryPage />);
     expect(await screen.findByText("No leave requests yet")).toBeInTheDocument();
   });
 
   it("shows a load error with a retry button", async () => {
     signIn("employee");
-    mockApi({ [`GET ${API}/leave-requests/mine`]: () => ({ status: 500, body: { detail: "Database unavailable", code: "HTTP_ERROR" } }) });
+    mockApi({ [`GET ${API}/leave-types`]: TYPES, [`GET ${API}/leave-requests/mine`]: () => ({ status: 500, body: { detail: "Database unavailable", code: "HTTP_ERROR" } }) });
     renderPage(<HistoryPage />);
     expect(await screen.findByText("Database unavailable")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
+  });
+
+  it("filters by leave type and dates, and sends them to the API", async () => {
+    signIn("employee");
+    const { calls } = mockApi({ [`GET ${API}/leave-types`]: TYPES, [`GET ${API}/leave-requests/mine`]: [base] });
+    renderPage(<HistoryPage />);
+    await screen.findByRole("table");
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Leave type" }), "2");
+    fireEvent.change(screen.getByLabelText("From date"), { target: { value: "2030-03-01" } });
+    fireEvent.change(screen.getByLabelText("To date"), { target: { value: "2030-03-31" } });
+    await waitFor(() => {
+      const q = calls.filter((c) => c.path.endsWith("/leave-requests/mine")).at(-1)!.query;
+      expect([q.get("leave_type_id"), q.get("start_date"), q.get("end_date")]).toEqual(["2", "2030-03-01", "2030-03-31"]);
+    });
+    await userEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+    await waitFor(() => {
+      const q = calls.filter((c) => c.path.endsWith("/leave-requests/mine")).at(-1)!.query;
+      expect(q.get("leave_type_id")).toBeNull();
+    });
   });
 });

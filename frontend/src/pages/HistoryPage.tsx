@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation } from "react-router-dom";
 
 import { errorMessage } from "../api/client";
-import { leaveApi } from "../api/endpoints";
+import { leaveApi, referenceApi } from "../api/endpoints";
 import type { LeaveRequest, LeaveStatus } from "../api/types";
 import { RequestTable } from "../components/RequestTable";
 import { Alert, EmptyState, ErrorAlert, Field, Modal, PageHeader, Spinner } from "../components/ui";
@@ -26,13 +26,24 @@ export function HistoryPage() {
   const location = useLocation();
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState<LeaveStatus | "">("");
+  const [leaveTypeId, setLeaveTypeId] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const extraFilters = Boolean(leaveTypeId || startDate || endDate);
   const [flash, setFlash] = useState<string | null>((location.state as { flash?: string } | null)?.flash ?? null);
   const [target, setTarget] = useState<LeaveRequest | null>(null);
   const [reason, setReason] = useState("");
 
+  const leaveTypes = useQuery({ queryKey: ["leave-types"], queryFn: referenceApi.leaveTypes });
   const requests = useQuery({
-    queryKey: ["my-requests", filter],
-    queryFn: () => leaveApi.mine(filter || undefined),
+    queryKey: ["my-requests", filter, leaveTypeId, startDate, endDate],
+    queryFn: () =>
+      leaveApi.mine({
+        status: filter || undefined,
+        leave_type_id: leaveTypeId ? Number(leaveTypeId) : undefined,
+        start_date: startDate || undefined,
+        end_date: endDate || undefined,
+      }),
   });
 
   const cancel = useMutation({
@@ -83,6 +94,33 @@ export function HistoryPage() {
         ))}
       </div>
 
+      <div className="toolbar" role="group" aria-label="Filters">
+        <select aria-label="Leave type" value={leaveTypeId} onChange={(e) => setLeaveTypeId(e.target.value)}>
+          <option value="">All leave types</option>
+          {(leaveTypes.data ?? []).map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.name}
+            </option>
+          ))}
+        </select>
+        <input type="date" aria-label="From date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+        <input type="date" aria-label="To date" min={startDate || undefined} value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+        {extraFilters && (
+          <button
+            type="button"
+            className="btn btn-small btn-ghost"
+            onClick={() => {
+              setLeaveTypeId("");
+              setStartDate("");
+              setEndDate("");
+            }}
+          >
+            Clear filters
+          </button>
+        )}
+        {requests.data && <span className="muted small">{requests.data.length} request{requests.data.length === 1 ? "" : "s"}</span>}
+      </div>
+
       {requests.isPending && <Spinner />}
       <ErrorAlert error={requests.error} onRetry={() => requests.refetch()} />
       {requests.data &&
@@ -99,7 +137,7 @@ export function HistoryPage() {
             }
           />
         ) : (
-          <EmptyState title={filter ? `No ${filter} requests` : "No leave requests yet"}>
+          <EmptyState title={extraFilters ? "No requests match these filters" : filter ? `No ${filter} requests` : "No leave requests yet"}>
             <Link to="/apply">Apply for leave</Link>
           </EmptyState>
         ))}

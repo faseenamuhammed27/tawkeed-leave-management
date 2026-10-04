@@ -493,6 +493,19 @@ class TestVisibilityAndLists:
         rows = client.get(f"{BASE}/mine", params={"status": "rejected"}, headers=auth_headers(employee)).json()
         assert [r["status"] for r in rows] == ["rejected"]
 
+    def test_history_filters_by_leave_type_and_dates(self, client, employee, annual, sick, pending):
+        sick_req = submit(client, employee, sick, date(2026, 4, 6), date(2026, 4, 7)).json()
+        mine = "/api/v1/leave-requests/mine"
+        get = lambda **p: [r["id"] for r in client.get(mine, params=p, headers=auth_headers(employee)).json()]
+        assert get(leave_type_id=sick.id) == [sick_req["id"]]
+        assert get(leave_type_id=annual.id) == [pending["id"]]
+        assert get(start_date="2026-04-01") == [sick_req["id"]]          # overlap with the range
+        assert get(end_date="2026-03-31") == [pending["id"]]
+        assert get(start_date="2026-03-10", end_date="2026-03-10") == [pending["id"]]  # inside 9-11 Mar
+        assert get(start_date="2026-05-01", end_date="2026-05-31") == []
+        r = client.get(mine, params={"start_date": "2026-05-01", "end_date": "2026-04-01"}, headers=auth_headers(employee))
+        assert r.status_code == 422
+
     def test_history_does_not_include_others(self, client, employee2, pending):
         assert client.get(f"{BASE}/mine", headers=auth_headers(employee2)).json() == []
 
