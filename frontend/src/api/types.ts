@@ -88,6 +88,35 @@ export interface LeaveRequest {
   created_at: string;
 }
 
+export interface StatusCounts {
+  pending: number;
+  approved: number;
+  rejected: number;
+  cancelled: number;
+}
+
+export interface MemberLeaveType {
+  leave_type_id: number;
+  leave_type_code: string;
+  leave_type_name: string;
+  allocated_days: number;
+  used_days: number;
+  pending_days: number;
+  available_days: number;
+  requests: StatusCounts;
+}
+
+export interface MemberLeaveSummary {
+  id: number;
+  full_name: string;
+  email: string;
+  role: Role;
+  manager_name: string | null;
+  year: number;
+  leave_types: MemberLeaveType[];
+  totals: StatusCounts;
+}
+
 export interface CalendarEntry {
   request_id: number;
   employee_id: number;

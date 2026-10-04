@@ -8,6 +8,7 @@ import { CalendarPage } from "./pages/CalendarPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { HistoryPage } from "./pages/HistoryPage";
 import { LoginPage } from "./pages/LoginPage";
+import { TeamMembersPage } from "./pages/TeamMembersPage";
 import { AllowancesPage } from "./pages/admin/AllowancesPage";
 import { AuditLogPage } from "./pages/admin/AuditLogPage";
 import { HolidaysPage } from "./pages/admin/HolidaysPage";
@@ -30,6 +31,7 @@ export function App() {
         <Route path="history" element={<RequireAuth roles={["employee", "manager"]}><HistoryPage /></RequireAuth>} />
         <Route path="approvals" element={<RequireAuth roles={["manager", "admin"]}><ApprovalsPage /></RequireAuth>} />
         <Route path="calendar" element={<RequireAuth roles={["manager", "admin"]}><CalendarPage /></RequireAuth>} />
+        <Route path="team" element={<RequireAuth roles={["manager", "admin"]}><TeamMembersPage /></RequireAuth>} />
         <Route path="admin/users" element={<RequireAuth roles={["admin"]}><UsersPage /></RequireAuth>} />
         <Route path="admin/allowances" element={<RequireAuth roles={["admin"]}><AllowancesPage /></RequireAuth>} />
         <Route path="admin/leave-types" element={<RequireAuth roles={["admin"]}><LeaveTypesPage /></RequireAuth>} />

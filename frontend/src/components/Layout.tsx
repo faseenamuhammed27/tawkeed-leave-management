@@ -28,6 +28,7 @@ export const NAV_SECTIONS: { title: string; items: NavItem[] }[] = [
     title: "Team",
     items: [
       { to: "/approvals", label: "Approvals", roles: ["manager", "admin"] },
+      { to: "/team", label: "Team members", roles: ["manager", "admin"] },
       { to: "/calendar", label: "Team calendar", roles: ["manager", "admin"] },
     ],
   },

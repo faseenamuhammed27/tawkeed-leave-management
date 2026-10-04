@@ -174,6 +174,7 @@ The API's `CORS_ORIGINS` must include the frontend's address (`http://localhost:
 | Apply for leave | employee, manager | Date pickers with a **live working-day count** from the API (`/leave-requests/preview`), holidays in range, balance warning; API errors shown in the form |
 | My requests | employee, manager | History with status filters; cancel own pending leave, or approved leave before it starts |
 | Approvals | manager, admin | Queue with filters for status, leave type, person, date range (and role, for the admin), kept in the URL; the admin also sees each requester's role; approve (optional comment) or reject (**comment required**) |
+| Team members | manager, admin | One row per person: days left / used / pending and request counts per status for each leave type, yearly totals, link to their requests; filters for name, leave type, year (and role, for the admin, who also sees each person's role and manager) |
 | Team calendar | manager, admin | Month view of approved leave with weekends and holidays marked; admins can cancel approved leave as a correction (reason required) |
 | Users & managers, Allowances, Leave types, Public holidays, Audit log | admin | Everything the admin API offers |
 
@@ -224,8 +225,8 @@ still in the future while the demo is reviewed. In the Docker image, `docker-ent
 
 | Suite | Tool | Tests | Result |
 |---|---|---|---|
-| Backend: business rules, permissions, auth/security, admin, seed | pytest + coverage | 326 | all passing, **97.6% line coverage** (CI gate: 70%) |
-| Frontend: components, API client, role-based UI | Vitest + Testing Library | 52 | all passing |
+| Backend: business rules, permissions, auth/security, admin, seed | pytest + coverage | 335 | all passing, **97.6% line coverage** (CI gate: 70%) |
+| Frontend: components, API client, role-based UI | Vitest + Testing Library | 56 | all passing |
 | End-to-end: full employee → manager → admin workflow in a real browser | Playwright | 3 | all passing (CI, local, and once against the live site) |
 | Deployment smoke test against a running API | `scripts/smoke_test.py` | 37 checks | all passing |
 
@@ -245,7 +246,7 @@ pytest --cov=app --cov-report=term-missing
 
 | File | Covers |
 |---|---|
-| `test_leave_rules.py` | One class per business rule 1–7, plus decisions D1–D5, visibility, team queue and its filters, calendar and database backstops |
+| `test_leave_rules.py` | One class per business rule 1–7, plus decisions D1–D5, visibility, team queue and its filters, team leave summary, calendar and database backstops |
 | `test_permissions.py` | Every protected endpoint × {anonymous, employee, manager, admin}: 401/403 as expected; a guard test fails if a new endpoint is not in the matrix |
 | `test_auth.py` | Login, identical errors for unknown email/wrong password, lockout and expiry, expired/forged/`alg=none` tokens, bcrypt storage, CORS, security headers |
 | `test_admin.py` | User management with the one-manager-level rules, single admin (API and database), allowances, leave types, holidays, audit log paging/filters, audit log is read-only |
@@ -256,7 +257,7 @@ pytest --cov=app --cov-report=term-missing
 
 ```bash
 cd frontend
-npm test                      # Vitest + Testing Library (52 tests)
+npm test                      # Vitest + Testing Library (56 tests)
 npm run typecheck
 E2E_PASSWORD=<demo password> npm run e2e   # Playwright; needs the API and `npm run preview -- --port 5173` running
 ```
@@ -270,6 +271,7 @@ E2E_PASSWORD=<demo password> npm run e2e   # Playwright; needs the API and `npm 
 | `src/pages/ApplyLeavePage.test.tsx` | Live working-day count from the API, balance warning, end-before-start, required fields, API refusal shown, successful submit |
 | `src/pages/ApprovalsPage.test.tsx` | Queue, empty state, **reject disabled until a comment is entered**, approve, API refusal shown, filters read from the URL and sent to the API, no role filter for managers |
 | `src/pages/HistoryPage.test.tsx` | Status and decision details, cancel only where allowed, cancel flow, API refusal, empty and error states |
+| `src/pages/TeamMembersPage.test.tsx` | Balance and status counts per leave type, role/manager columns and role filter for the admin only, leave type filter, empty state |
 | `src/lib/dates.test.ts` | Asia/Dubai "today", month grid, date ranges |
 | `e2e/leave-workflow.spec.ts` | Real browser against the real API: employee applies (live count, overlap refused, admin pages blocked) → manager approves one and rejects one with a comment → calendar shows the approved leave → employee sees the decisions and cancels → admin screens and audit log. Also runs the login error on a mobile viewport |
 
@@ -307,6 +309,7 @@ To try protected endpoints in Swagger: call `POST /api/v1/auth/login`, click **A
 | `POST /api/v1/leave-requests/{id}/cancel` | owner / admin | Cancel (see D3) |
 | `GET /api/v1/team/members` | manager, admin | People whose requests the caller can decide on |
 | `GET /api/v1/team/leave-requests?status=&leave_type_id=&employee_id=&role=&start_date=&end_date=` | manager, admin | Requests the caller can decide on (a manager's team; everyone for the admin), with filters |
+| `GET /api/v1/team/leave-summary?year=&role=&search=` | manager, admin | Per person: balance per leave type and request counts per status (a manager's team; everyone for the admin) |
 | `GET /api/v1/team/calendar?start_date=&end_date=` | manager, admin | Approved leave in a date range |
 | `GET/POST /api/v1/admin/users`, `GET/PATCH /api/v1/admin/users/{id}` | admin | Manage users and managers (only one admin account: 409 for a second) |
 | `GET/PUT /api/v1/admin/users/{id}/balances` | admin | Yearly allowances |

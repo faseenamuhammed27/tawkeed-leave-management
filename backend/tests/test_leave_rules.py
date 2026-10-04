@@ -638,3 +638,50 @@ class TestApprovalQueueFilters:
     def test_invalid_range_is_422(self, client, admin):
         r = client.get(self.QUEUE, params={"start_date": "2026-05-01", "end_date": "2026-04-01"}, headers=auth_headers(admin))
         assert r.status_code == 422
+
+
+class TestTeamLeaveSummary:
+    """GET /team/leave-summary: per-person balances and request counts per status and leave type."""
+
+    URL = "/api/v1/team/leave-summary"
+
+    def get(self, client, user, **params):
+        r = client.get(self.URL, params=params, headers=auth_headers(user))
+        assert r.status_code == 200, r.text
+        return {row["full_name"]: row for row in r.json()}
+
+    @pytest.fixture
+    def activity(self, client, manager, employee, employee2, annual, sick):
+        a = submit(client, employee, annual, date(2026, 3, 9), date(2026, 3, 11)).json()   # approved, 3 days
+        approve(client, manager, a["id"])
+        submit(client, employee, annual, date(2026, 3, 16), date(2026, 3, 17))              # pending, 2 days
+        b = submit(client, employee, sick, date(2026, 3, 23), date(2026, 3, 23)).json()     # rejected
+        reject(client, manager, b["id"])
+        c = submit(client, employee2, annual, date(2026, 4, 6), date(2026, 4, 6)).json()    # cancelled
+        cancel(client, employee2, c["id"])
+
+    def test_counts_and_balances_per_leave_type(self, client, manager, activity):
+        eve = self.get(client, manager)["Eve Employee"]
+        by_type = {t["leave_type_code"]: t for t in eve["leave_types"]}
+        assert (by_type["ANNUAL"]["used_days"], by_type["ANNUAL"]["pending_days"], by_type["ANNUAL"]["available_days"]) == (3, 2, 15)
+        assert by_type["ANNUAL"]["requests"] == {"pending": 1, "approved": 1, "rejected": 0, "cancelled": 0}
+        assert by_type["SICK"]["requests"] == {"pending": 0, "approved": 0, "rejected": 1, "cancelled": 0}
+        assert eve["totals"] == {"pending": 1, "approved": 1, "rejected": 1, "cancelled": 0}
+        assert self.get(client, manager)["Ed Employee"]["totals"]["cancelled"] == 1
+
+    def test_manager_sees_only_own_team(self, client, manager, employee, employee2, outsider, activity):
+        assert set(self.get(client, manager)) == {"Eve Employee", "Ed Employee"}
+
+    def test_admin_sees_everyone_but_themselves_and_can_filter_by_role(self, client, admin, manager, outsider, other_manager, activity):
+        everyone = self.get(client, admin)
+        assert {"Eve Employee", "Ed Employee", "Olga Outsider", "Maya Manager", "Omar Othermanager"} <= set(everyone)
+        assert "Ada Admin" not in everyone
+        assert everyone["Eve Employee"]["manager_name"] == "Maya Manager"
+        assert set(self.get(client, admin, role="manager")) == {"Maya Manager", "Omar Othermanager"}
+
+    def test_search_and_year(self, client, manager, activity):
+        assert set(self.get(client, manager, search="eve")) == {"Eve Employee"}
+        assert self.get(client, manager, year=2027)["Eve Employee"]["totals"] == {"pending": 0, "approved": 0, "rejected": 0, "cancelled": 0}
+
+    def test_employees_cannot_see_it(self, client, employee):
+        assert client.get(self.URL, headers=auth_headers(employee)).status_code == 403

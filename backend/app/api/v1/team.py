@@ -6,7 +6,8 @@ from fastapi import APIRouter, Query
 from app.api.deps import DbSession, ManagerOrAdmin
 from app.core.errors import InvalidInputError
 from app.models import LeaveStatus, UserRole
-from app.schemas.leave import CalendarEntry, LeaveRequestOut
+from app.core import clock
+from app.schemas.leave import CalendarEntry, LeaveRequestOut, MemberLeaveSummary
 from app.schemas.user import UserBrief
 from app.services import leave_service
 
@@ -40,6 +41,21 @@ def team_requests(
         role=role, start=start_date, end=end_date,
     )
     return [LeaveRequestOut.from_model(r) for r in rows]
+
+
+@router.get("/leave-summary", response_model=list[MemberLeaveSummary])
+def leave_summary(
+    user: ManagerOrAdmin,
+    db: DbSession,
+    year: Annotated[int | None, Query(ge=2000, le=2100, description="Defaults to the current year")] = None,
+    role: Annotated[UserRole | None, Query(description="Only people with this role")] = None,
+    search: Annotated[str | None, Query(max_length=100)] = None,
+):
+    """Leave overview per person: balance per leave type and request counts per status.
+
+    Managers see their own team; the admin sees everyone except themselves.
+    """
+    return leave_service.team_summary(db, user, year or clock.today().year, role=role, search=search)
 
 
 @router.get("/calendar", response_model=list[CalendarEntry])

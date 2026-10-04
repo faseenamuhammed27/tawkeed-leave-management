@@ -8,6 +8,7 @@ import type {
   LeaveRequest,
   LeaveStatus,
   LeaveType,
+  MemberLeaveSummary,
   Page,
   Role,
   TokenResponse,
@@ -56,6 +57,8 @@ export const teamApi = {
   requests: (filters: QueueFilters = {}) => api.get<LeaveRequest[]>(`${V1}/team/leave-requests`, filters),
   calendar: (start_date: string, end_date: string) =>
     api.get<CalendarEntry[]>(`${V1}/team/calendar`, { start_date, end_date }),
+  leaveSummary: (query: { year?: number; role?: Role; search?: string } = {}) =>
+    api.get<MemberLeaveSummary[]>(`${V1}/team/leave-summary`, query),
 };
 
 export interface UserCreateBody {

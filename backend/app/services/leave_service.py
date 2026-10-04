@@ -17,7 +17,7 @@ checks cannot race.
 from collections.abc import Sequence
 from datetime import date
 
-from sqlalchemy import ColumnElement, and_, false, select
+from sqlalchemy import ColumnElement, and_, extract, false, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
@@ -187,6 +187,61 @@ def list_for_approver(
 
 def team_members(db: Session, actor: User) -> Sequence[User]:
     return db.scalars(select(User).where(approver_scope(actor)).order_by(User.full_name)).all()
+
+
+def team_summary(
+    db: Session, actor: User, year: int, *, role: UserRole | None = None, search: str | None = None,
+) -> list[dict]:
+    """Per person the actor can decide on: balance per leave type and request counts per status.
+
+    Same scope as the approval queue (a manager's team; everyone else for the admin). Requests are
+    counted in the year their leave starts.
+    """
+    stmt = (
+        select(User)
+        .where(approver_scope(actor), User.is_active.is_(True))
+        .options(selectinload(User.manager))
+        .order_by(User.full_name)
+    )
+    if role is not None:
+        stmt = stmt.where(User.role == role)
+    if search:
+        pattern = f"%{search.strip().lower()}%"
+        stmt = stmt.where(or_(func.lower(User.full_name).like(pattern), User.email.like(pattern)))
+    users = db.scalars(stmt).all()
+    if not users:
+        return []
+
+    counts: dict[tuple[int, int], dict[str, int]] = {}
+    rows = db.execute(
+        select(LeaveRequest.employee_id, LeaveRequest.leave_type_id, LeaveRequest.status, func.count())
+        .where(
+            LeaveRequest.employee_id.in_([u.id for u in users]),
+            extract("year", LeaveRequest.start_date) == year,
+        )
+        .group_by(LeaveRequest.employee_id, LeaveRequest.leave_type_id, LeaveRequest.status)
+    )
+    for employee_id, leave_type_id, status, n in rows:
+        counts.setdefault((employee_id, leave_type_id), {})[status.value] = n
+
+    result = []
+    for u in users:
+        leave_types, totals = [], {"pending": 0, "approved": 0, "rejected": 0, "cancelled": 0}
+        for s in balance_service.summaries_for_user(db, u.id, year):
+            c = counts.get((u.id, s.leave_type.id), {})
+            for k in totals:
+                totals[k] += c.get(k, 0)
+            leave_types.append({
+                "leave_type_id": s.leave_type.id, "leave_type_code": s.leave_type.code,
+                "leave_type_name": s.leave_type.name, "allocated_days": s.allocated_days,
+                "used_days": s.used_days, "pending_days": s.pending_days,
+                "available_days": s.available_days, "requests": c,
+            })
+        result.append({
+            "id": u.id, "full_name": u.full_name, "email": u.email, "role": u.role,
+            "manager_name": u.manager_name, "year": year, "leave_types": leave_types, "totals": totals,
+        })
+    return result
 
 
 def calendar(db: Session, actor: User, start: date, end: date) -> Sequence[LeaveRequest]:

@@ -29,6 +29,7 @@ ENDPOINTS = [
     ("POST", "/api/v1/leave-requests/999999/reject", MANAGERS),
     ("GET", "/api/v1/team/members", MANAGERS),
     ("GET", "/api/v1/team/leave-requests", MANAGERS),
+    ("GET", "/api/v1/team/leave-summary", MANAGERS),
     ("GET", "/api/v1/team/calendar?start_date=2026-03-01&end_date=2026-03-31", MANAGERS),
     ("GET", "/api/v1/admin/users", ADMINS),
     ("POST", "/api/v1/admin/users", ADMINS),

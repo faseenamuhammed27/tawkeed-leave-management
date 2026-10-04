@@ -169,6 +169,35 @@ class LeaveRequestOut(BaseModel):
         )
 
 
+class StatusCounts(BaseModel):
+    pending: int = 0
+    approved: int = 0
+    rejected: int = 0
+    cancelled: int = 0
+
+
+class MemberLeaveType(BaseModel):
+    leave_type_id: int
+    leave_type_code: str
+    leave_type_name: str
+    allocated_days: int
+    used_days: int
+    pending_days: int
+    available_days: int
+    requests: StatusCounts
+
+
+class MemberLeaveSummary(BaseModel):
+    id: int
+    full_name: str
+    email: str
+    role: UserRole
+    manager_name: str | None
+    year: int
+    leave_types: list[MemberLeaveType]
+    totals: StatusCounts
+
+
 class CalendarEntry(BaseModel):
     request_id: int
     employee_id: int
