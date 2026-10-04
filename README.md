@@ -338,9 +338,8 @@ Status codes: `200`/`201`/`204` success · `400` business rule · `401` not logg
 
 Hosted on **Render** using the Blueprint in [`render.yaml`](render.yaml):
 
-- **tawkeed-leave-db** – managed PostgreSQL 17. Connections need the Render-generated password and SSL. `render.yaml` asks for no
-  external IP allow-list (`ipAllowList: []`), but the free plan applies an inherited workspace-level allow-all rule
-  (`0.0.0.0/0`) that cannot be removed, so the database is reachable from the internet with those credentials.
+- **tawkeed-leave-db** – managed PostgreSQL 17. External access is controlled by Render's access-control list;
+  connections also require the Render-generated password and SSL. The API connects over Render's internal network.
 - **tawkeed-leave-web** – the React app as a static site (`npm ci && npm run build`), with SPA rewrites and security headers.
   `VITE_API_BASE_URL` points it at the API; the API's `CORS_ORIGINS` allows only this address.
 - **tawkeed-leave-api** – the Docker image from `backend/Dockerfile`, HTTPS by default, health check on `/health`.
@@ -409,8 +408,8 @@ Known limitations:
 - The lockout is per account, so someone could deliberately lock another user out for 15 minutes
   (use the `lockout-test` account to try it). Per-IP rate limiting would be the next step.
 - No refresh tokens: users sign in again after 30 minutes.
-- On Render's free plan the database cannot be restricted to the private network (an inherited `0.0.0.0/0` rule applies);
-  it is protected by its generated password and SSL. A paid plan would allow limiting it to Render's private network.
+- The free Render plan does not offer a fully private database network; external access is limited by Render's
+  access-control list and still requires the generated password and SSL.
 - Admins cannot change a user's email address.
 - Seeded public holidays are illustrative, not an official calendar.
 - Render free tier: the service sleeps when idle (slow first request) and the free database expires after 30 days.
