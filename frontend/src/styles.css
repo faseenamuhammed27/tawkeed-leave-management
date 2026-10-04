@@ -117,7 +117,11 @@ input, select, textarea {
   font: inherit; font-size: 0.95rem; padding: 8px 10px; border-radius: 8px; border: 1px solid #cbd5e1;
   background: #fff; color: var(--text); width: 100%;
 }
-.toolbar input, .toolbar select { width: auto; min-width: 200px; }
+/* Filter bars: one line on desktop; controls share the width and shrink evenly. */
+.toolbar input, .toolbar select { width: auto; min-width: 0; flex: 0 1 190px; }
+.toolbar input[type="date"] { flex: 0 0 155px; }
+.toolbar > .btn, .toolbar > span { flex: none; white-space: nowrap; }
+@media (min-width: 1360px) { .toolbar { flex-wrap: nowrap; } }
 input:disabled, select:disabled { background: var(--surface-2); color: var(--muted); }
 input[aria-invalid="true"] { border-color: var(--danger); }
 .form { display: grid; gap: 14px; }
@@ -237,7 +241,7 @@ input[aria-invalid="true"] { border-color: var(--danger); }
   .sidebar.open { transform: translateX(0); }
   .content { margin-left: 0; padding: calc(var(--topbar) + 16px) 16px 40px; }
   .field-row { grid-template-columns: 1fr; }
-  .toolbar input, .toolbar select { width: 100%; min-width: 0; }
+  .toolbar input, .toolbar select { width: 100%; min-width: 0; flex: 1 1 100%; }
   .calendar-cell { min-height: 64px; padding: 4px; }
   .calendar-chip, .calendar-holiday { font-size: 0.62rem; }
   /* Tables become stacked cards on small screens. */
@@ -260,7 +264,6 @@ input[aria-invalid="true"] { border-color: var(--danger); }
 .stat-rejected .big-number { color: var(--danger); }
 .type-breakdown { list-style: none; margin: 6px 0 0; padding: 6px 0 0; border-top: 1px solid var(--border); font-size: 0.82rem; }
 .type-breakdown li { display: flex; justify-content: space-between; padding: 2px 0; }
-.toolbar input[type="date"] { min-width: 150px; }
 .chip-row { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
 .mini-chip { font-size: 0.72rem; font-weight: 600; padding: 1px 7px; border-radius: 999px; white-space: nowrap; }
 .leave-cell { min-width: 150px; }
