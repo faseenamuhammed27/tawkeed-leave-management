@@ -91,7 +91,6 @@ export function TeamMembersPage() {
                 <tr>
                   <th className="row-num">#</th>
                   <th>Name</th>
-                  {isAdmin && <th>Role</th>}
                   {isAdmin && <th>Manager</th>}
                   {visibleTypes.map((t) => (
                     <th key={t.id}>{t.name}</th>
@@ -107,12 +106,8 @@ export function TeamMembersPage() {
                     <td data-label="Name">
                       <div>{m.full_name}</div>
                       <div className="muted small">{m.email}</div>
+                      {isAdmin && <span className={`role-chip role-${m.role} name-role`}>{m.role}</span>}
                     </td>
-                    {isAdmin && (
-                      <td data-label="Role">
-                        <span className={`role-chip role-${m.role}`}>{m.role}</span>
-                      </td>
-                    )}
                     {isAdmin && <td data-label="Manager">{m.manager_name ?? <span className="muted">—</span>}</td>}
                     {visibleTypes.map((t) => {
                       const lt = m.leave_types.find((x) => x.leave_type_id === t.id);

@@ -44,7 +44,9 @@ describe("TeamMembersPage", () => {
     const { calls } = mockApi({ [`GET ${API}/team/leave-summary`]: [SARA], [`GET ${API}/leave-types`]: TYPES });
     renderPage(<TeamMembersPage />);
     await screen.findByText("Sara Ahmed");
-    expect(screen.getByRole("columnheader", { name: "Role" })).toBeInTheDocument();
+    // The role badge sits in the Name cell (no separate Role column).
+    expect(screen.queryByRole("columnheader", { name: "Role" })).not.toBeInTheDocument();
+    expect(screen.getByRole("cell", { name: /Sara Ahmed/ })).toHaveTextContent("employee");
     expect(screen.getByRole("columnheader", { name: "Manager" })).toBeInTheDocument();
     expect(screen.getByText("Khalid Rahman")).toBeInTheDocument();
     await userEvent.selectOptions(screen.getByRole("combobox", { name: "Role" }), "manager");
