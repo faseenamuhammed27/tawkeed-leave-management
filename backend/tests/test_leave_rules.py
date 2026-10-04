@@ -639,6 +639,17 @@ class TestApprovalQueueFilters:
         r = client.get(self.QUEUE, params={"start_date": "2026-05-01", "end_date": "2026-04-01"}, headers=auth_headers(admin))
         assert r.status_code == 422
 
+    def test_deactivated_requester_is_marked_and_filterable(self, client, db, admin, manager, employee, employee2, mixed):
+        employee.is_active = False
+        db.flush()
+        rows = {r["id"]: r for r in client.get(self.QUEUE, headers=auth_headers(manager)).json()}
+        assert rows[mixed["a"]]["employee_is_active"] is False
+        assert rows[mixed["b"]]["employee_is_active"] is True
+        # Deactivated people's requests stay visible so they can still be closed.
+        assert self.ids(client, manager, employee_active="false") == {mixed["a"]}
+        assert self.ids(client, manager, employee_active="true") == {mixed["b"]}
+        assert self.ids(client, admin, employee_active="false") == {mixed["a"]}
+
 
 class TestTeamLeaveSummary:
     """GET /team/leave-summary: per-person balances and request counts per status and leave type."""

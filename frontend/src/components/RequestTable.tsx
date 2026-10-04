@@ -36,7 +36,12 @@ export function RequestTable({
         <tbody>
           {requests.map((r) => (
             <tr key={r.id}>
-              {showEmployee && <td data-label="Employee">{r.employee_name}</td>}
+              {showEmployee && (
+                <td data-label="Employee">
+                  {r.employee_name}
+                  {!r.employee_is_active && <span className="badge badge-cancelled deactivated-badge">Deactivated</span>}
+                </td>
+              )}
               {showRole && (
                 <td data-label="Role">
                   <span className={`role-chip role-${r.employee_role}`}>{r.employee_role}</span>

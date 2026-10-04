@@ -48,6 +48,7 @@ export type QueueFilters = {
   leave_type_id?: number;
   employee_id?: number;
   role?: Role;
+  employee_active?: boolean;
   start_date?: string;
   end_date?: string;
 };

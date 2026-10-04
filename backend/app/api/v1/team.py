@@ -30,6 +30,7 @@ def team_requests(
     leave_type_id: int | None = None,
     employee_id: int | None = None,
     role: Annotated[UserRole | None, Query(description="Requester's role (employee or manager)")] = None,
+    employee_active: Annotated[bool | None, Query(description="true: active users only; false: deactivated only")] = None,
     start_date: Annotated[date | None, Query(description="Requests overlapping this date or later")] = None,
     end_date: Annotated[date | None, Query(description="Requests overlapping this date or earlier")] = None,
 ):
@@ -38,7 +39,7 @@ def team_requests(
         raise InvalidInputError("end_date cannot be before start_date")
     rows = leave_service.list_for_approver(
         db, user, status_filter, leave_type_id=leave_type_id, employee_id=employee_id,
-        role=role, start=start_date, end=end_date,
+        role=role, employee_active=employee_active, start=start_date, end=end_date,
     )
     return [LeaveRequestOut.from_model(r) for r in rows]
 

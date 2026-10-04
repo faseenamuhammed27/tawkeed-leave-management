@@ -69,6 +69,7 @@ export interface LeaveRequest {
   employee_id: number;
   employee_name: string;
   employee_role: Role;
+  employee_is_active: boolean;
   leave_type_id: number;
   leave_type_code: string;
   leave_type_name: string;

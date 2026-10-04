@@ -26,10 +26,11 @@ export function ApprovalsPage() {
     leave_type_id: num("leave_type_id"),
     employee_id: num("employee_id"),
     role: isAdmin ? ((params.get("role") as Role | null) ?? undefined) : undefined,
+    employee_active: params.get("active") === "true" ? true : params.get("active") === "false" ? false : undefined,
     start_date: params.get("start_date") ?? undefined,
     end_date: params.get("end_date") ?? undefined,
   };
-  const extraFilters = ["leave_type_id", "employee_id", "role", "start_date", "end_date"].some((k) => params.get(k));
+  const extraFilters = ["leave_type_id", "employee_id", "role", "active", "start_date", "end_date"].some((k) => params.get(k));
 
   function setFilter(key: string, value: string) {
     const next = new URLSearchParams(params);
@@ -108,6 +109,11 @@ export function ApprovalsPage() {
             <option value="manager">Managers</option>
           </select>
         )}
+        <select aria-label="User status" value={params.get("active") ?? ""} onChange={(e) => setFilter("active", e.target.value)}>
+          <option value="">All users</option>
+          <option value="true">Active users</option>
+          <option value="false">Deactivated users</option>
+        </select>
         <select aria-label="Person" value={params.get("employee_id") ?? ""} onChange={(e) => setFilter("employee_id", e.target.value)}>
           <option value="">Everyone</option>
           {(members.data ?? []).map((m) => (

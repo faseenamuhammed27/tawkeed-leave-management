@@ -7,7 +7,7 @@ import { API, mockApi, renderPage, signIn } from "../test/utils";
 import { ApprovalsPage } from "./ApprovalsPage";
 
 const REQUEST: LeaveRequest = {
-  id: 7, employee_id: 3, employee_name: "Sara Ahmed", employee_role: "employee", leave_type_id: 1, leave_type_code: "ANNUAL",
+  id: 7, employee_id: 3, employee_name: "Sara Ahmed", employee_role: "employee", employee_is_active: true, leave_type_id: 1, leave_type_code: "ANNUAL",
   leave_type_name: "Annual Leave", start_date: "2030-03-04", end_date: "2030-03-05", working_days: 2, reason: "Family visit",
   status: "pending", decided_by_id: null, decided_by_name: null, decision_comment: null, decided_at: null,
   cancelled_by_id: null, cancelled_by_name: null, cancellation_reason: null, cancelled_at: null, created_at: "2030-01-01T10:00:00Z",
@@ -146,5 +146,23 @@ describe("ApprovalsPage", () => {
     renderPage(<ApprovalsPage />);
     const table = await screen.findByRole("table");
     expect(within(table).queryByRole("columnheader", { name: "Role" })).not.toBeInTheDocument();
+  });
+
+  it("marks deactivated users and filters by user status", async () => {
+    signIn("manager");
+    const { calls } = mockApi({
+      ...FILTER_DATA,
+      [`GET ${API}/team/leave-requests`]: [REQUEST, { ...REQUEST, id: 9, employee_name: "Left Company", employee_is_active: false }],
+    });
+    renderPage(<ApprovalsPage />, { route: "/approvals", path: "/approvals" });
+    const left = (await screen.findByText("Left Company")).closest("td")!;
+    expect(within(left).getByText("Deactivated")).toBeInTheDocument();
+    const sara = screen.getByText("Sara Ahmed", { selector: "td" });
+    expect(within(sara).queryByText("Deactivated")).not.toBeInTheDocument();
+
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "User status" }), "false");
+    await waitFor(() =>
+      expect(calls.some((c) => c.path.endsWith("/team/leave-requests") && c.query.get("employee_active") === "false")).toBe(true),
+    );
   });
 });

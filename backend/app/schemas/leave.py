@@ -135,6 +135,7 @@ class LeaveRequestOut(BaseModel):
     employee_id: int
     employee_name: str
     employee_role: UserRole
+    employee_is_active: bool
     leave_type_id: int
     leave_type_code: str
     leave_type_name: str
@@ -157,7 +158,7 @@ class LeaveRequestOut(BaseModel):
     def from_model(cls, r: LeaveRequest) -> "LeaveRequestOut":
         return cls(
             id=r.id, employee_id=r.employee_id, employee_name=r.employee.full_name,
-            employee_role=r.employee.role,
+            employee_role=r.employee.role, employee_is_active=r.employee.is_active,
             leave_type_id=r.leave_type_id, leave_type_code=r.leave_type.code, leave_type_name=r.leave_type.name,
             start_date=r.start_date, end_date=r.end_date, working_days=r.working_days, reason=r.reason,
             status=r.status,

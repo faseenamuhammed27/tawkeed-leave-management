@@ -264,3 +264,4 @@ input[aria-invalid="true"] { border-color: var(--danger); }
 .chip-row { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
 .mini-chip { font-size: 0.72rem; font-weight: 600; padding: 1px 7px; border-radius: 999px; white-space: nowrap; }
 .leave-cell { min-width: 150px; }
+.deactivated-badge { margin-left: 8px; font-size: 0.7rem; vertical-align: middle; }

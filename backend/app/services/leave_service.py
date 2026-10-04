@@ -157,6 +157,7 @@ def list_for_approver(
     leave_type_id: int | None = None,
     employee_id: int | None = None,
     role: UserRole | None = None,
+    employee_active: bool | None = None,
     start: date | None = None,
     end: date | None = None,
 ) -> Sequence[LeaveRequest]:
@@ -178,6 +179,8 @@ def list_for_approver(
         stmt = stmt.where(LeaveRequest.employee_id == employee_id)
     if role is not None:
         stmt = stmt.where(User.role == role)
+    if employee_active is not None:
+        stmt = stmt.where(User.is_active.is_(employee_active))
     if start is not None:
         stmt = stmt.where(LeaveRequest.end_date >= start)
     if end is not None:
