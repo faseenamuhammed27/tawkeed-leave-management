@@ -111,7 +111,7 @@ describe("ApprovalsPage", () => {
     signIn("admin");
     const { calls } = mockApi({ ...FILTER_DATA, [`GET ${API}/team/leave-requests`]: [REQUEST] });
     renderPage(<ApprovalsPage />, { route: "/approvals", path: "/approvals" });
-    await screen.findByText("Sara Ahmed", { selector: "td" });
+    await screen.findByRole("cell", { name: /Sara Ahmed/ });
     await userEvent.selectOptions(screen.getByRole("combobox", { name: "Person" }), "3");
     await waitFor(() =>
       expect(calls.some((c) => c.path.endsWith("/team/leave-requests") && c.query.get("employee_id") === "3")).toBe(true),
@@ -155,10 +155,12 @@ describe("ApprovalsPage", () => {
       [`GET ${API}/team/leave-requests`]: [REQUEST, { ...REQUEST, id: 9, employee_name: "Left Company", employee_is_active: false }],
     });
     renderPage(<ApprovalsPage />, { route: "/approvals", path: "/approvals" });
-    const left = (await screen.findByText("Left Company")).closest("td")!;
-    expect(within(left).getByText("Deactivated")).toBeInTheDocument();
-    const sara = screen.getByText("Sara Ahmed", { selector: "td" });
-    expect(within(sara).queryByText("Deactivated")).not.toBeInTheDocument();
+    // The status badge sits in the Employee cell, next to the name (no extra column).
+    const leftCell = (await screen.findByText("Left Company")).closest("td")!;
+    expect(within(leftCell).getByText("Deactivated")).toBeInTheDocument();
+    const saraCell = screen.getByRole("cell", { name: /Sara Ahmed/ });
+    expect(within(saraCell).getByText("Active")).toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "User status" })).not.toBeInTheDocument();
 
     await userEvent.selectOptions(screen.getByRole("combobox", { name: "User status" }), "false");
     await waitFor(() =>

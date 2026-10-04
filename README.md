@@ -173,7 +173,7 @@ The API's `CORS_ORIGINS` must include the frontend's address (`http://localhost:
 | Dashboard | everyone | Employees and managers: balance cards (allocated, used, pending, available), recent requests, holidays, pending approvals. Admin: manager and employee counts, and Pending / Approved / Rejected widgets broken down by leave type for **this month or this year**; each widget opens the filtered list |
 | Apply for leave | employee, manager | Date pickers with a **live working-day count** from the API (`/leave-requests/preview`), holidays in range, balance warning; API errors shown in the form |
 | My requests | employee, manager | History with status filters; cancel own pending leave, or approved leave before it starts |
-| Approvals | manager, admin | Queue with filters for status, leave type, person, date range (and role, for the admin), kept in the URL; a **Deactivated** badge and an active/deactivated filter for both managers and the admin; the admin also sees each requester's role; approve (optional comment) or reject (**comment required**) |
+| Approvals | manager, admin | Queue with filters for status, leave type, person, date range (and role, for the admin), kept in the URL; an **Active** / **Deactivated** badge next to each name and a matching filter for both managers and the admin; the admin also sees each requester's role; approve (optional comment) or reject (**comment required**) |
 | Team members | manager, admin | One row per person: days left / used / pending and request counts per status for each leave type, yearly totals, link to their requests; filters for name, leave type, year (and role, for the admin, who also sees each person's role and manager) |
 | Team calendar | manager, admin | Month view of approved leave with weekends and holidays marked; admins can cancel approved leave as a correction (reason required) |
 | Users & managers, Allowances, Leave types, Public holidays, Audit log | admin | Everything the admin API offers |
@@ -404,7 +404,7 @@ Where the brief left details open, these decisions were made:
 - Pending requests whose start date has passed can still be approved or rejected, but no longer cancelled.
 - Changing a leave type's default allowance applies to balances not yet created; existing ones are adjusted per user.
 - Users are deactivated, never deleted, to keep the audit history intact. A deactivated person's pending requests
-  stay in the approval queue (marked **Deactivated**) so a manager or the admin can still close them. A manager with team members cannot be
+  stay in the approval queue (badge **Deactivated**) so a manager or the admin can still close them. A manager with team members cannot be
   deactivated or demoted until the team is reassigned. Admins cannot demote or deactivate themselves.
 - Viewing another person's request returns 403 (not 404).
 - Managers' calendar shows their team and themselves; admins see everyone.

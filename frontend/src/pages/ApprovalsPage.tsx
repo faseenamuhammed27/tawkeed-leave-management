@@ -140,6 +140,7 @@ export function ApprovalsPage() {
             requests={requests.data}
             showEmployee
             showRole={isAdmin}
+            showUserStatus
             caption="Team leave requests"
             actions={(r) =>
               r.status === "pending" ? (

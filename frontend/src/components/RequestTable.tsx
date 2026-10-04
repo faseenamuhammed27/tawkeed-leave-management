@@ -8,12 +8,14 @@ export function RequestTable({
   requests,
   showEmployee = false,
   showRole = false,
+  showUserStatus = false,
   actions,
   caption,
 }: {
   requests: LeaveRequest[];
   showEmployee?: boolean;
   showRole?: boolean;
+  showUserStatus?: boolean;
   actions?: (r: LeaveRequest) => ReactNode;
   caption?: string;
 }) {
@@ -38,8 +40,15 @@ export function RequestTable({
             <tr key={r.id}>
               {showEmployee && (
                 <td data-label="Employee">
-                  {r.employee_name}
-                  {!r.employee_is_active && <span className="badge badge-cancelled deactivated-badge">Deactivated</span>}
+                  <span className="name-with-badge">
+                    {r.employee_name}
+                    {showUserStatus &&
+                      (r.employee_is_active ? (
+                        <span className="badge badge-active status-badge">Active</span>
+                      ) : (
+                        <span className="badge badge-cancelled status-badge">Deactivated</span>
+                      ))}
+                  </span>
                 </td>
               )}
               {showRole && (
