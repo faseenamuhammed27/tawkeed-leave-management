@@ -27,6 +27,7 @@ async function login(page: Page, email: string) {
 
 async function logout(page: Page) {
   await page.getByRole("button", { name: "Sign out" }).click();
+  await page.getByRole("dialog", { name: "Sign out" }).getByRole("button", { name: "Sign out" }).click();
   await expect(page.getByRole("button", { name: "Sign in" })).toBeVisible();
 }
 

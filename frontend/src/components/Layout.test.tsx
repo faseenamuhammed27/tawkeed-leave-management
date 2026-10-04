@@ -1,4 +1,5 @@
-import { screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
 import type { Role } from "../api/types";
@@ -26,6 +27,28 @@ describe("role-based navigation (visibility only; the API enforces access)", () 
     renderPage(<Layout />);
     expect(screen.getByText("Khalid Rahman")).toBeInTheDocument();
     expect(screen.getByText("Manager")).toBeInTheDocument();
+  });
+});
+
+describe("sign out", () => {
+  it("asks for confirmation; Cancel keeps the session", async () => {
+    signIn("employee");
+    renderPage(<Layout />);
+    await userEvent.click(screen.getByRole("button", { name: "Sign out" }));
+    const dialog = screen.getByRole("dialog", { name: "Sign out" });
+    expect(dialog).toHaveTextContent("Are you sure you want to sign out?");
+    expect(within(dialog).getByRole("button", { name: "Cancel" })).toHaveFocus();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(localStorage.getItem("tawkeed.session")).not.toBeNull();
+  });
+
+  it("signs out after confirming", async () => {
+    signIn("employee");
+    renderPage(<Layout />);
+    await userEvent.click(screen.getByRole("button", { name: "Sign out" }));
+    await userEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Sign out" }));
+    expect(localStorage.getItem("tawkeed.session")).toBeNull();
   });
 });
 

@@ -3,6 +3,7 @@ import { NavLink, Outlet } from "react-router-dom";
 
 import type { Role } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
+import { Modal } from "./ui";
 
 interface NavItem {
   to: string;
@@ -47,6 +48,7 @@ const ROLE_LABEL: Record<Role, string> = { employee: "Employee", manager: "Manag
 export function Layout() {
   const { user, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [confirmSignOut, setConfirmSignOut] = useState(false);
   if (!user) return null;
 
   return (
@@ -67,7 +69,7 @@ export function Layout() {
         <div className="topbar-user">
           <span className="user-name">{user.full_name}</span>
           <span className={`role-chip role-${user.role}`}>{ROLE_LABEL[user.role]}</span>
-          <button type="button" className="btn btn-small btn-ghost" onClick={() => logout()}>
+          <button type="button" className="btn btn-small btn-ghost" onClick={() => setConfirmSignOut(true)}>
             Sign out
           </button>
         </div>
@@ -99,6 +101,26 @@ export function Layout() {
       <main className="content">
         <Outlet />
       </main>
+
+      {confirmSignOut && (
+        <Modal
+          title="Sign out"
+          onClose={() => setConfirmSignOut(false)}
+          footer={
+            <>
+              {/* Cancel comes first so it gets focus: pressing Enter does not sign you out by accident. */}
+              <button type="button" className="btn btn-ghost" onClick={() => setConfirmSignOut(false)}>
+                Cancel
+              </button>
+              <button type="button" className="btn btn-primary" onClick={() => logout()}>
+                Sign out
+              </button>
+            </>
+          }
+        >
+          <p>Are you sure you want to sign out?</p>
+        </Modal>
+      )}
     </div>
   );
 }

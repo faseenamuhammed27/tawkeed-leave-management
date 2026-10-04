@@ -225,7 +225,7 @@ still in the future while the demo is reviewed. In the Docker image, `docker-ent
 | Suite | Tool | Tests | Result |
 |---|---|---|---|
 | Backend: business rules, permissions, auth/security, admin, seed | pytest + coverage | 326 | all passing, **97.6% line coverage** (CI gate: 70%) |
-| Frontend: components, API client, role-based UI | Vitest + Testing Library | 50 | all passing |
+| Frontend: components, API client, role-based UI | Vitest + Testing Library | 52 | all passing |
 | End-to-end: full employee → manager → admin workflow in a real browser | Playwright | 3 | all passing (CI, local, and once against the live site) |
 | Deployment smoke test against a running API | `scripts/smoke_test.py` | 37 checks | all passing |
 
@@ -256,7 +256,7 @@ pytest --cov=app --cov-report=term-missing
 
 ```bash
 cd frontend
-npm test                      # Vitest + Testing Library (50 tests)
+npm test                      # Vitest + Testing Library (52 tests)
 npm run typecheck
 E2E_PASSWORD=<demo password> npm run e2e   # Playwright; needs the API and `npm run preview -- --port 5173` running
 ```
@@ -264,7 +264,7 @@ E2E_PASSWORD=<demo password> npm run e2e   # Playwright; needs the API and `npm 
 | File | Covers |
 |---|---|
 | `src/api/client.test.ts` | Bearer token, API error shape → readable messages, field validation errors, sign-out on 401, network errors |
-| `src/components/Layout.test.tsx` | Menu per role (no leave menu for the admin), route guards (signed out → login, wrong role → "no access") |
+| `src/components/Layout.test.tsx` | Menu per role (no leave menu for the admin), sign-out confirmation (Cancel keeps the session), route guards (signed out → login, wrong role → "no access") |
 | `src/pages/DashboardPage.test.tsx` | Employee dashboard with balance cards; admin widgets by status and leave type, links to filtered lists, month/year switch, no personal balances |
 | `src/pages/LoginPage.test.tsx` | Required fields, wrong password and lockout messages from the API, successful sign-in |
 | `src/pages/ApplyLeavePage.test.tsx` | Live working-day count from the API, balance warning, end-before-start, required fields, API refusal shown, successful submit |
